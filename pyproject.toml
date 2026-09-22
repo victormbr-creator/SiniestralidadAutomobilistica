@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "siniestros-viales-mx"
+version = "0.1.0"
+description = "Análisis reproducible de severidad de siniestros viales en México"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.1", "numpy>=1.26", "scikit-learn>=1.4", "xgboost>=2.0",
+  "shap>=0.44", "matplotlib>=3.8", "geopandas>=0.14", "libpysal>=4.9",
+  "esda>=2.5", "pyarrow>=14", "requests>=2.31", "jupyter>=1.0",
+  "streamlit>=1.30"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

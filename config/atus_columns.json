@@ -1,0 +1,17 @@
+{
+  "note": "TODO: completar solo tras verificar diccionario y archivos ATUS por año. Los valores son nombres de columnas de origen.",
+  "mapping": {
+    "deaths": null,
+    "injuries": null,
+    "event_id": null,
+    "event_date": null,
+    "event_time": null,
+    "collision_type": null,
+    "vulnerable_user": null,
+    "motorcycle": null,
+    "alcohol": null,
+    "municipality": null,
+    "state": null,
+    "vehicle_count": null
+  }
+}
