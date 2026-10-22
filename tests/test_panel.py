@@ -1,5 +1,5 @@
 import pandas as pd
-from siniestros_riesgo.panel import balanced_municipalities, build_monthly_panel, freeze_post_2022_features
+from siniestros_riesgo.panel import balanced_municipalities, build_monthly_panel, freeze_after_year, freeze_post_2022_features
 
 
 def sample_events() -> pd.DataFrame:
@@ -23,3 +23,14 @@ def test_frozen_holdout_does_not_use_2023_outcome() -> None:
     frozen = freeze_post_2022_features(panel)
     value = frozen.loc[(frozen.year == 2023) & (frozen.month == 2), "lag_1"].iloc[0]
     assert value == panel.loc[panel.year <= 2022].groupby("geo_id").victim_crashes.tail(12).mean()
+
+
+def test_frozen_holdout_accepts_a_new_cutoff() -> None:
+    data = sample_events()
+    extra = data[data.year.eq(2023)].copy()
+    extra["year"] = 2024
+    extra["event_id"] = "a2024"
+    panel = build_monthly_panel(pd.concat([data, extra], ignore_index=True), [2021, 2022, 2023, 2024])
+    frozen = freeze_after_year(panel, 2023)
+    expected = panel.loc[panel.year.eq(2023), "victim_crashes"].mean()
+    assert frozen.loc[(frozen.year == 2024) & (frozen.month == 2), "lag_1"].iloc[0] == expected

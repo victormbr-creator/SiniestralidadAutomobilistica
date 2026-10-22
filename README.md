@@ -4,16 +4,16 @@ Pipeline reproducible para predecir siniestros viales con personas heridas o fal
 
 ## Estado actual
 
-ATUS anual 2018-2024 fue procesado, pero el análisis sustantivo usa exclusivamente registros de Ciudad de México. La unidad predictiva es alcaldía-mes. El proyecto también incorpora ATUS georreferenciado 2019-2024, dos cortes CLUES y la cartera SEDESA 2025: 34 hospitales tienen al menos un servicio de urgencias explícitamente marcado y fueron vinculados con coordenadas CLUES.
+ATUS anual 2018-2025 fue procesado, pero el análisis sustantivo usa exclusivamente registros de Ciudad de México. La unidad predictiva es alcaldía-mes. El proyecto también incorpora ATUS georreferenciado 2019-2024, dos cortes CLUES y la cartera SEDESA 2025: 34 hospitales tienen al menos un servicio de urgencias explícitamente marcado y fueron vinculados con coordenadas CLUES.
 
 ## Unidad y diseño
 
-- Panel de las 16 alcaldías por mes, 2018-2024.
+- Panel de las 16 alcaldías por mes, 2018-2025.
 - Conteo principal: siniestros con `muertos_total + heridos_total > 0`.
 - Binario secundario: al menos un siniestro con víctimas en la unidad-mes.
-- Entrenamiento 2018-2022; prueba final 2023-2024 con rezagos congelados.
-- Predicción operativa 2025, reajustada con 2018-2024.
-- Horizonte dinámico de un mes y horizonte congelado 2023-2024 con información disponible hasta 2022.
+- Entrenamiento 2018-2023; prueba final 2024-2025 con rezagos congelados.
+- Pronóstico móvil de los próximos 12 meses, reajustado con toda la historia observada hasta 2025.
+- El mes inicial y la longitud del horizonte son configurables; el valor predeterminado comienza el mes siguiente a la ejecución.
 - Mapa puntual observado de 8,820 siniestros con víctimas, 2019-2024.
 - Distancia directa desde cada siniestro al hospital con urgencias verificado más cercano.
 
@@ -38,10 +38,19 @@ En macOS, XGBoost suele requerir `brew install libomp`. Las dependencias geoespa
 
 Cada comando escribe logs en `outputs/logs/`. Los scripts se ejecutan desde la raíz y no utilizan rutas absolutas.
 
+Para fijar un horizonte reproducible:
+
+```bash
+python scripts/run_cdmx_analysis.py --forecast-start 2026-11 --horizon-months 12
+python scripts/build_report.py
+```
+
+Si el horizonte empieza después del último mes observado, el pipeline genera meses puente de forma recursiva y registra su número en `outputs/models/cdmx_manifest.json`.
+
 ## Modelos y evaluación
 
 Se comparan promedio móvil de 12 meses, binomial negativa, Random Forest y XGBoost Poisson. Los predictores incluyen rezagos propios y de alcaldías vecinas. Se calculan MAE, devianza Poisson, captura top 5%/10% y diferencias contra baseline mediante bootstrap por bloques de alcaldía.
 
 ## Límites sustantivos
 
-ATUS excluye carreteras federales; la ausencia de registros no prueba ausencia de siniestros. La población censal 2020 es fija. El mapa puntual es histórico y la predicción conserva resolución de alcaldía. Las distancias a hospitales son euclidianas y no equivalen a tiempo de ambulancia. La red de urgencias cubre SEDESA/IMSS-Bienestar; no incluye todo IMSS, ISSSTE, sector privado, Cruz Roja ni bases de ambulancias.
+ATUS excluye carreteras federales; la ausencia de registros no prueba ausencia de siniestros. La población censal 2020 es fija. El mapa puntual es histórico y la predicción conserva resolución de alcaldía. La incertidumbre aumenta con cada mes recursivo entre el último dato observado y el horizonte objetivo. Las distancias a hospitales son euclidianas y no equivalen a tiempo de ambulancia. La red de urgencias cubre SEDESA/IMSS-Bienestar; no incluye todo IMSS, ISSSTE, sector privado, Cruz Roja ni bases de ambulancias.

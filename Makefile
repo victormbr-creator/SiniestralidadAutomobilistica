@@ -1,4 +1,6 @@
 PYTHON ?= python3
+HORIZON_MONTHS ?= 12
+FORECAST_ARGS = --horizon-months $(HORIZON_MONTHS) $(if $(FORECAST_START),--forecast-start $(FORECAST_START),)
 
 .PHONY: install validate prepare panel geospatial quality spatial train evaluate results coverage report test all clean
 install:
@@ -16,7 +18,7 @@ quality:
 spatial:
 	$(PYTHON) scripts/run_spatial.py
 train:
-	$(PYTHON) scripts/run_cdmx_analysis.py
+	$(PYTHON) scripts/run_cdmx_analysis.py $(FORECAST_ARGS)
 evaluate:
 	@echo "La evaluación se genera dentro de make train para preservar la apertura única del test."
 results:

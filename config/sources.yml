@@ -5,7 +5,7 @@ sources:
     landing_page: https://www.inegi.org.mx/programas/accidentes/
     metadata_identifier: MEX-INEGI.40.302.03-ATUS-1997-2025
     metadata_modified: 2026-08-28
-    years_used: [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+    years_used: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
     license: https://www.inegi.org.mx/inegi/terminos.html
   atus_georeferenced:
     provider: INEGI

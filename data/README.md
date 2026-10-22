@@ -6,7 +6,7 @@ Este repositorio no contiene datos originales. `data/raw/` recibe copias sin mod
 
 | Fuente | Edición/año | Archivo local | URL oficial | Fecha de descarga | Licencia/términos | SHA-256 | Transformación | Exclusiones |
 |---|---:|---|---|---|---|---|---|---|
-| ATUS anual | 2018-2024 | `conjunto_de_datos_atus_anual_csv/` | https://www.inegi.org.mx/programas/accidentes/ | Archivos con marca 2026-08-27; incorporados 2026-10-22 | https://www.inegi.org.mx/inegi/terminos.html | Véase abajo | Limpieza, suma de víctimas, panel | Se excluye 2025 del estudio |
+| ATUS anual | 2018-2025 | `conjunto_de_datos_atus_anual_csv/` | https://www.inegi.org.mx/programas/accidentes/ | Archivos con marca 2026-08-27; incorporados 2026-10-22 | https://www.inegi.org.mx/inegi/terminos.html | Véase abajo | Limpieza, suma de víctimas, panel | 2025 contiene los 12 meses y cifras definitivas |
 | ATUS georreferenciado | 2019-2024 | `data/raw/atus_georreferenciado/` | https://www.inegi.org.mx/programas/accidentes/ | 2026-10-22 | https://www.inegi.org.mx/inegi/terminos.html | Véase abajo | Filtro CDMX, validación espacial y puntos con víctimas | No existe publicación georreferenciada 2025 al corte |
 | Censo de Población | 2020 | TODO | TODO | TODO | TODO | TODO | Unión municipal; población fija | TODO |
 | Red Nacional de Caminos | TODO | TODO | TODO | TODO | TODO | TODO | Longitud total/primaria | TODO |
@@ -14,7 +14,7 @@ Este repositorio no contiene datos originales. `data/raw/` recibe copias sin mod
 | Cartera hospitalaria SEDESA | 2025 | `data/raw/clues/cartera_servicios_hospitales_segundo_nivel_sedesa_2025.xlsx` | https://www.salud.cdmx.gob.mx/ver-mas/unidades/hospitales | 2026-10-22 | Portal público SEDESA | Véase abajo | Verificación de urgencias y vínculo con CLUES | Red SEDESA/IMSS-Bienestar; no incluye todas las instituciones |
 | Marco geoestadístico | TODO | TODO | TODO | TODO | TODO | TODO | Geometrías municipales | TODO |
 | Catálogo municipal y población | consulta 2026-10-22 | `data/external/inegi_municipal_catalog.csv` | https://gaia.inegi.org.mx/wscatgeo/v2/mgem/ | 2026-10-22 | Términos INEGI | TODO | Nombres y población contextual | Población fija; validar evento censal |
-| Polígonos de alcaldías CDMX | consulta 2026-10-22 | `data/external/cdmx_alcaldias_inegi.geojson` | https://gaia.inegi.org.mx/wscatgeo/v2/geo/mgem/09 | 2026-10-22 | Términos INEGI | TODO | Mapa de ranking 2025 | Solo CDMX |
+| Polígonos de alcaldías CDMX | consulta 2026-10-22 | `data/external/cdmx_alcaldias_inegi.geojson` | https://gaia.inegi.org.mx/wscatgeo/v2/geo/mgem/09 | 2026-10-22 | Términos INEGI | TODO | Mapa del horizonte futuro | Solo CDMX |
 | Infraestructura de salud por alcaldía | 2020 | `data/raw/infraestructura_salud_alcaldias_cdmx_2020.csv` | URL SEDECO/CDMX consignada dentro del CSV | Incorporado 2026-10-22 | TODO: verificar términos del anexo | `b4661f2d8eed3006b6a04757b6069107b8583f26b8fdefebeff9f3393ea9126f` | Brecha relativa riesgo-capacidad | Red SEDESA; no inventario completo de urgencias ni de IMSS/ISSSTE |
 
 ## Reglas
@@ -68,6 +68,7 @@ Los totales de víctimas se construyen con campos documentados:
 | 2022 | `bffa7d5e817e97d3cd0150a806463f7ae3647fdb4327f76436361f7b16e0d7ba` |
 | 2023 | `121d7743238ce725eb6898fe548618d4d60e347dc1438b941060b4201b33cc22` |
 | 2024 | `00bd5292cff42b13edd1e9c828e898890073e8d729eeee405de418d70263d29c` |
+| 2025 | `6bc21394ea023cb75752d3741f8c828ec99cbaacde410d5b9cc0638140524fed` |
 
 ## Archivos esperados
 

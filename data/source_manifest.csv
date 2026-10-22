@@ -1,4 +1,5 @@
 source,edition,local_raw_path,official_url,downloaded_on,bytes,sha256
+INEGI ATUS anual,2025,data/raw/conjunto_de_datos_atus_anual_csv/conjunto_de_datos/atus_anual_2025.csv,https://www.inegi.org.mx/programas/accidentes/,2026-10-22,99455789,6bc21394ea023cb75752d3741f8c828ec99cbaacde410d5b9cc0638140524fed
 INEGI ATUS georreferenciado,2019,data/raw/atus_georreferenciado/atus_2019_shp.zip,https://www.inegi.org.mx/contenidos/programas/accidentes/datosabiertos/atus_2019_shp.zip,2026-10-22,18137672,759acc8b03620b2caccd485aa8b80ceda8e9ede91b9500d123468809b71e480d
 INEGI ATUS georreferenciado,2020,data/raw/atus_georreferenciado/atus_2020_shp.zip,https://www.inegi.org.mx/contenidos/programas/accidentes/datosabiertos/atus_2020_shp.zip,2026-10-22,15527865,aede5e72cba1ba10a19f061a24a2d3d32ce1954a70a38c049bea16267581d64f
 INEGI ATUS georreferenciado,2021,data/raw/atus_georreferenciado/atus_2021_shp.zip,https://www.inegi.org.mx/contenidos/programas/accidentes/datosabiertos/atus_2021_shp.zip,2026-10-22,21029371,42e5303fb57600ec0e6be767ad10f785019e1fd8f5d91fe52e8c12cab6399b34

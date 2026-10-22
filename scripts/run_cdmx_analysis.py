@@ -1,5 +1,6 @@
-"""Fit CDMX-only alcaldía models and compare predicted risk with SEDESA capacity."""
+"""Fit CDMX-only models and forecast a configurable future rolling horizon."""
 
+import argparse
 import json
 import joblib
 import matplotlib.pyplot as plt
@@ -18,19 +19,32 @@ from xgboost import XGBRegressor
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
-from siniestros_riesgo.config import FIGURES, MODELS, PROCESSED, RAW, TABLES, setup_logging
+from siniestros_riesgo.config import FIGURES, MODELS, PROCESSED, PROJECT_CONFIG, RAW, TABLES, load_yaml, setup_logging
 from siniestros_riesgo.evaluation import count_metrics, block_bootstrap_difference
 
 SEED=42
 logger=setup_logging("run_cdmx_analysis")
 TABLES.mkdir(parents=True,exist_ok=True); FIGURES.mkdir(parents=True,exist_ok=True); MODELS.mkdir(parents=True,exist_ok=True)
+cfg=load_yaml(PROJECT_CONFIG)
+default_start=(pd.Timestamp.now(tz="America/Mexico_City").tz_localize(None).to_period("M")+1)
+parser=argparse.ArgumentParser(description="Pronóstico móvil de siniestros con víctimas por alcaldía")
+parser.add_argument("--forecast-start",default=str(default_start),help="Primer mes futuro, formato AAAA-MM")
+parser.add_argument("--horizon-months",type=int,default=int(cfg.get("forecast_horizon_months",12)))
+args=parser.parse_args()
+forecast_start=pd.Period(args.forecast_start,freq="M")
+if args.horizon_months<1: raise SystemExit("--horizon-months debe ser positivo")
+forecast_end=forecast_start+args.horizon_months-1
+months_es=("enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre")
+def period_label(period): return f"{months_es[period.month-1]} de {period.year}"
+horizon_label=f"{period_label(forecast_start)} a {period_label(forecast_end)}"
 
 # Panel exclusivo de las 16 demarcaciones territoriales.
 panel=pd.read_parquet(PROCESSED/"municipality_month_panel.parquet").query("state_code == '09'").copy()
 catalog=pd.read_csv("data/external/inegi_municipal_catalog.csv",dtype={"cvegeo":"string"}); catalog["cvegeo"]=catalog.cvegeo.str.zfill(5); catalog["population"]=pd.to_numeric(catalog.pob_total,errors="coerce")
 panel=panel.merge(catalog[["cvegeo","nomgeo","population"]],left_on="geo_id",right_on="cvegeo",how="left",validate="many_to_one").drop(columns="cvegeo")
 if panel.geo_id.nunique()!=16: raise SystemExit(f"Se esperaban 16 alcaldías, se encontraron {panel.geo_id.nunique()}")
-panel["month_sin"]=np.sin(2*np.pi*panel.month/12); panel["month_cos"]=np.cos(2*np.pi*panel.month/12); panel["time_index"]=(panel.year-2018)*12+panel.month-1
+origin_year=min(cfg["years"])
+panel["month_sin"]=np.sin(2*np.pi*panel.month/12); panel["month_cos"]=np.cos(2*np.pi*panel.month/12); panel["time_index"]=(panel.year-origin_year)*12+panel.month-1
 
 # Vecindad Queen oficial de las alcaldías; el rezago usa únicamente el mes anterior.
 geo=gpd.read_file("data/external/cdmx_alcaldias_inegi.geojson").sort_values("cvegeo").reset_index(drop=True)
@@ -41,12 +55,13 @@ def spatial_value(row):
     return float(np.nanmean(values)) if np.isfinite(values).any() else np.nan
 panel["spatial_lag_1"]=panel.apply(spatial_value,axis=1)
 
-# Congelar todos los rezagos del test en diciembre/promedio de 2022.
-frozen=panel.copy(); train_mask=frozen.year.le(2022); test_mask=frozen.year.ge(2023)
-dec22=frozen[(frozen.year==2022)&(frozen.month==12)].set_index("geo_id").victim_crashes
-mean22=frozen[frozen.year==2022].groupby("geo_id").victim_crashes.mean()
-spatial22={code:float(np.mean([dec22[n] for n in neighbors[code]])) for code in dec22.index}
-frozen.loc[test_mask,"lag_1"]=frozen.loc[test_mask,"geo_id"].map(dec22); frozen.loc[test_mask,"mean_lag_12"]=frozen.loc[test_mask,"geo_id"].map(mean22); frozen.loc[test_mask,"spatial_lag_1"]=frozen.loc[test_mask,"geo_id"].map(spatial22)
+# Congelar todos los rezagos del test al cierre del periodo de entrenamiento.
+train_years=cfg["train_years"]; test_years=cfg["test_years"]; train_end=max(train_years)
+frozen=panel.copy(); test_mask=frozen.year.isin(test_years)
+last_train=frozen[(frozen.year==train_end)&(frozen.month==12)].set_index("geo_id").victim_crashes
+mean_train=frozen[frozen.year==train_end].groupby("geo_id").victim_crashes.mean()
+spatial_train={code:float(np.mean([last_train[n] for n in neighbors[code]])) for code in last_train.index}
+frozen.loc[test_mask,"lag_1"]=frozen.loc[test_mask,"geo_id"].map(last_train); frozen.loc[test_mask,"mean_lag_12"]=frozen.loc[test_mask,"geo_id"].map(mean_train); frozen.loc[test_mask,"spatial_lag_1"]=frozen.loc[test_mask,"geo_id"].map(spatial_train)
 panel.to_parquet(PROCESSED/"cdmx_alcaldia_month_panel.parquet",index=False); frozen.to_parquet(PROCESSED/"cdmx_alcaldia_month_panel_frozen.parquet",index=False)
 
 features=["lag_1","mean_lag_12","spatial_lag_1","month_sin","month_cos","time_index","geo_id"]
@@ -60,14 +75,14 @@ for name,options in candidates.items():
     means=[]
     for option,estimator in enumerate(options):
         scores=[]
-        for valid_year in (2021,2022):
+        for valid_year in cfg["validation_years"]:
             fit=panel[panel.year<valid_year]; valid=panel[panel.year==valid_year]
             model=Pipeline([("prep",clone(prep)),("model",clone(estimator))]); model.fit(fit[features],fit.victim_crashes); score=mean_absolute_error(valid.victim_crashes,np.clip(model.predict(valid[features]),0,None)); scores.append(score); validation.append({"model":name,"option":option,"validation_year":valid_year,"mae":score})
         means.append(np.mean(scores))
     selected[name]=options[int(np.argmin(means))]
 pd.DataFrame(validation).to_csv(TABLES/"cdmx_temporal_validation.csv",index=False)
 
-train=panel[panel.year<=2022].copy(); test=frozen[frozen.year>=2023].copy(); predictions=test[["geo_id","nomgeo","year","month","victim_crashes"]].copy(); predictions["baseline"]=test.mean_lag_12.to_numpy()
+train=panel[panel.year.isin(train_years)].copy(); test=frozen[frozen.year.isin(test_years)].copy(); predictions=test[["geo_id","nomgeo","year","month","victim_crashes"]].copy(); predictions["baseline"]=test.mean_lag_12.to_numpy()
 for name,estimator in selected.items():
     model=Pipeline([("prep",clone(prep)),("model",estimator)]); model.fit(train[features],train.victim_crashes); predictions[name]=np.clip(model.predict(test[features]),0,None); joblib.dump(model,MODELS/f"cdmx_{name}.joblib")
 # NB2 con rezagos logarítmicos para evitar extrapolación explosiva.
@@ -84,14 +99,18 @@ for name in ("negative_binomial","random_forest","xgboost_poisson"):
     boot.append({"model":name,"metric":"mae_model_minus_baseline",**block_bootstrap_difference(predictions,lambda y,p:mean_absolute_error(y,p),name,"baseline",1000,SEED)})
 pd.DataFrame(boot).to_csv(TABLES/"cdmx_bootstrap_differences.csv",index=False)
 
-# Reajuste del XGBoost seleccionado en 2018-2024 y proyección recursiva 2025.
+# Reajuste con toda la historia observada y proyección recursiva hasta el fin
+# del horizonte. Los meses entre el último dato y forecast_start son puente.
 final_model=Pipeline([("prep",clone(prep)),("model",clone(selected["xgboost_poisson"]))]); final_model.fit(panel[features],panel.victim_crashes)
+latest_observed=panel.date.max().to_period("M")
+if forecast_start<=latest_observed: raise SystemExit(f"El horizonte debe iniciar después de {latest_observed}")
 units=panel[["geo_id","nomgeo","population"]].drop_duplicates("geo_id").sort_values("geo_id"); histories={code:list(group.sort_values("date").victim_crashes.tail(12).astype(float)) for code,group in panel.groupby("geo_id")}; monthly=[]
-for month in range(1,13):
-    frame=units.copy(); frame["month"]=month; frame["year"]=2025; frame["lag_1"]=[histories[c][-1] for c in frame.geo_id]; frame["mean_lag_12"]=[np.mean(histories[c][-12:]) for c in frame.geo_id]; frame["spatial_lag_1"]=[np.mean([histories[n][-1] for n in neighbors[c]]) for c in frame.geo_id]; frame["month_sin"]=np.sin(2*np.pi*month/12); frame["month_cos"]=np.cos(2*np.pi*month/12); frame["time_index"]=84+month-1; frame["predicted_victim_crashes"]=np.clip(final_model.predict(frame[features]),0,None); monthly.append(frame[["geo_id","nomgeo","population","year","month","predicted_victim_crashes"]]);
+simulation_periods=pd.period_range(latest_observed+1,forecast_end,freq="M")
+for lead,period in enumerate(simulation_periods,start=1):
+    month=period.month; frame=units.copy(); frame["month"]=month; frame["year"]=period.year; frame["forecast_month"]=str(period); frame["lead_month_from_observed"]=lead; frame["forecast_role"]="bridge" if period<forecast_start else "target"; frame["lag_1"]=[histories[c][-1] for c in frame.geo_id]; frame["mean_lag_12"]=[np.mean(histories[c][-12:]) for c in frame.geo_id]; frame["spatial_lag_1"]=[np.mean([histories[n][-1] for n in neighbors[c]]) for c in frame.geo_id]; frame["month_sin"]=np.sin(2*np.pi*month/12); frame["month_cos"]=np.cos(2*np.pi*month/12); frame["time_index"]=(period.year-origin_year)*12+month-1; frame["predicted_victim_crashes"]=np.clip(final_model.predict(frame[features]),0,None); monthly.append(frame[["geo_id","nomgeo","population","year","month","forecast_month","lead_month_from_observed","forecast_role","predicted_victim_crashes"]]);
     for code,value in zip(frame.geo_id,frame.predicted_victim_crashes): histories[code].append(float(value))
-forecast=pd.concat(monthly,ignore_index=True); forecast.to_csv(TABLES/"cdmx_monthly_forecast_2025.csv",index=False)
-annual=forecast.groupby(["geo_id","nomgeo","population"],as_index=False).predicted_victim_crashes.sum().rename(columns={"predicted_victim_crashes":"predicted_annual_victim_crashes"})
+simulation=pd.concat(monthly,ignore_index=True); forecast=simulation[simulation.forecast_role.eq("target")].copy(); forecast["horizon_month"]=forecast.groupby("geo_id").cumcount()+1; forecast.to_csv(TABLES/"cdmx_monthly_forecast_future.csv",index=False)
+annual=forecast.groupby(["geo_id","nomgeo","population"],as_index=False).agg(predicted_horizon_victim_crashes=("predicted_victim_crashes","sum"),predicted_monthly_average=("predicted_victim_crashes","mean"))
 
 # Capacidad agregada SEDESA 2020 y hospitales con urgencias verificados en la
 # cartera oficial SEDESA 2025, georreferenciados con CLUES agosto de 2026.
@@ -103,22 +122,22 @@ if not emergency_path.exists(): raise SystemExit("Falta ejecutar scripts/prepare
 emergency_counts=pd.read_parquet(emergency_path).groupby("geo_id").size().rename("verified_emergency_hospitals")
 annual=annual.merge(emergency_counts,on="geo_id",how="left")
 annual["verified_emergency_hospitals"]=annual.verified_emergency_hospitals.fillna(0).astype(int)
-annual["predicted_rate_per_100k"]=annual.predicted_annual_victim_crashes/annual.population*100000
-annual["demand_share"]=annual.predicted_annual_victim_crashes/annual.predicted_annual_victim_crashes.sum(); annual["total_unit_share"]=annual.total_unidades/annual.total_unidades.sum(); annual["second_level_share"]=annual.hospitales_segundo_nivel/annual.hospitales_segundo_nivel.sum()
+annual["predicted_horizon_per_100k"]=annual.predicted_horizon_victim_crashes/annual.population*100000
+annual["demand_share"]=annual.predicted_horizon_victim_crashes/annual.predicted_horizon_victim_crashes.sum(); annual["total_unit_share"]=annual.total_unidades/annual.total_unidades.sum(); annual["second_level_share"]=annual.hospitales_segundo_nivel/annual.hospitales_segundo_nivel.sum()
 annual["verified_emergency_share"]=annual.verified_emergency_hospitals/annual.verified_emergency_hospitals.sum()
 annual["gap_total_units"]=annual.demand_share-annual.total_unit_share; annual["gap_second_level"]=annual.demand_share-annual.second_level_share
 annual["gap_verified_emergency"]=annual.demand_share-annual.verified_emergency_share
-annual["predicted_crashes_per_total_unit"]=annual.predicted_annual_victim_crashes/annual.total_unidades; annual["predicted_crashes_per_second_level_hospital"]=annual.predicted_annual_victim_crashes/annual.hospitales_segundo_nivel.replace(0,np.nan)
-annual["predicted_crashes_per_verified_emergency_hospital"]=annual.predicted_annual_victim_crashes/annual.verified_emergency_hospitals.replace(0,np.nan)
-annual["capacity_priority_rank"]=annual.gap_verified_emergency.rank(method="min",ascending=False).astype(int); annual=annual.sort_values("capacity_priority_rank"); annual.to_csv(TABLES/"cdmx_risk_capacity_priority_2025.csv",index=False)
+annual["predicted_crashes_per_total_unit"]=annual.predicted_horizon_victim_crashes/annual.total_unidades; annual["predicted_crashes_per_second_level_hospital"]=annual.predicted_horizon_victim_crashes/annual.hospitales_segundo_nivel.replace(0,np.nan)
+annual["predicted_crashes_per_verified_emergency_hospital"]=annual.predicted_horizon_victim_crashes/annual.verified_emergency_hospitals.replace(0,np.nan)
+annual["capacity_priority_rank"]=annual.gap_verified_emergency.rank(method="min",ascending=False).astype(int); annual=annual.sort_values("capacity_priority_rank"); annual.to_csv(TABLES/"cdmx_risk_capacity_priority_future.csv",index=False)
 
 # Figuras exclusivas de CDMX.
-fig,ax=plt.subplots(figsize=(8,4.8)); m=pd.DataFrame(metrics).sort_values("mae"); ax.barh(m.model,m.mae,color="#247B7B"); ax.set(title="Modelos exclusivos de CDMX: MAE 2023-2024",xlabel="MAE"); ax.grid(axis="x",alpha=.25); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_model_mae.png",dpi=220); plt.close(fig)
-mapdata=geo.merge(annual,left_on="cvegeo",right_on="geo_id",how="left",validate="one_to_one"); fig,ax=plt.subplots(figsize=(8,8)); mapdata.plot(column="predicted_annual_victim_crashes",cmap="YlOrRd",edgecolor="white",linewidth=.7,legend=True,ax=ax,legend_kwds={"label":"Siniestros con víctimas predichos"});
+fig,ax=plt.subplots(figsize=(8,4.8)); m=pd.DataFrame(metrics).sort_values("mae"); ax.barh(m.model,m.mae,color="#247B7B"); ax.set(title=f"Modelos exclusivos de CDMX: MAE {min(test_years)}-{max(test_years)}",xlabel="MAE"); ax.grid(axis="x",alpha=.25); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_model_mae.png",dpi=220); plt.close(fig)
+mapdata=geo.merge(annual,left_on="cvegeo",right_on="geo_id",how="left",validate="one_to_one"); fig,ax=plt.subplots(figsize=(8,8)); mapdata.plot(column="predicted_horizon_victim_crashes",cmap="YlOrRd",edgecolor="white",linewidth=.7,legend=True,ax=ax,legend_kwds={"label":f"Siniestros predichos en {args.horizon_months} meses"});
 for _,r in mapdata.iterrows(): p=r.geometry.representative_point(); ax.annotate(r.cve_mun,(p.x,p.y),ha="center",fontsize=7)
-ax.set_title("Predicción 2025 por alcaldía"); ax.axis("off"); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_risk_map_2025.png",dpi=220,bbox_inches="tight"); plt.close(fig)
-rankplot=annual.sort_values("predicted_annual_victim_crashes"); fig,ax=plt.subplots(figsize=(9,6)); ax.barh(rankplot.nomgeo,rankplot.predicted_annual_victim_crashes,color="#B33A3A"); ax.set(title="Siniestros con víctimas predichos por alcaldía, 2025",xlabel="Conteo anual predicho"); ax.grid(axis="x",alpha=.25); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_forecast_ranking.png",dpi=220,bbox_inches="tight"); plt.close(fig)
+ax.set_title(f"Pronóstico por alcaldía\n{horizon_label}"); ax.axis("off"); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_risk_map_future.png",dpi=220,bbox_inches="tight"); plt.close(fig)
+rankplot=annual.sort_values("predicted_horizon_victim_crashes"); fig,ax=plt.subplots(figsize=(9,6)); ax.barh(rankplot.nomgeo,rankplot.predicted_horizon_victim_crashes,color="#B33A3A"); ax.set(title=f"Siniestros con víctimas predichos por alcaldía\n{horizon_label}",xlabel=f"Conteo predicho en {args.horizon_months} meses"); ax.grid(axis="x",alpha=.25); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_forecast_ranking_future.png",dpi=220,bbox_inches="tight"); plt.close(fig)
 plot=annual.sort_values("gap_verified_emergency"); fig,ax=plt.subplots(figsize=(9,6)); colors=np.where(plot.gap_verified_emergency>0,"#B33A3A","#3A7D44"); ax.barh(plot.nomgeo,plot.gap_verified_emergency*100,color=colors); ax.axvline(0,color="black",linewidth=.8); ax.set(title="Brecha relativa: riesgo predicho vs hospitales con urgencias",xlabel="Puntos porcentuales (participación en riesgo - participación en hospitales)"); ax.grid(axis="x",alpha=.25); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_capacity_gap.png",dpi=220,bbox_inches="tight"); plt.close(fig)
-joblib.dump(final_model,MODELS/"cdmx_xgboost_refit_2018_2024.joblib")
-(MODELS/"cdmx_manifest.json").write_text(json.dumps({"scope":"Ciudad de México, 16 alcaldías","features":features,"train_years":[2018,2019,2020,2021,2022],"test_years":[2023,2024],"forecast_year":2025,"capacity_scenario":"34 hospitales con al menos un servicio de urgencias marcado en cartera SEDESA 2025; coordenadas CLUES agosto 2026","seed":SEED},ensure_ascii=False,indent=2),encoding="utf-8")
+joblib.dump(final_model,MODELS/"cdmx_xgboost_refit_latest.joblib")
+(MODELS/"cdmx_manifest.json").write_text(json.dumps({"scope":"Ciudad de México, 16 alcaldías","features":features,"observed_through":str(latest_observed),"train_years":train_years,"test_years":test_years,"forecast_start":str(forecast_start),"forecast_end":str(forecast_end),"forecast_horizon_months":args.horizon_months,"recursive_bridge_months":max(0,len(simulation_periods)-args.horizon_months),"capacity_scenario":"34 hospitales con al menos un servicio de urgencias marcado en cartera SEDESA 2025; coordenadas CLUES agosto 2026","seed":SEED},ensure_ascii=False,indent=2),encoding="utf-8")
 logger.info("Análisis CDMX terminado: %d observaciones train, %d test",len(train),len(test))

@@ -2,7 +2,7 @@
 
 import pandas as pd
 from siniestros_riesgo.config import PROJECT_CONFIG, PROCESSED, load_yaml, setup_logging
-from siniestros_riesgo.panel import build_monthly_panel, freeze_post_2022_features
+from siniestros_riesgo.panel import build_monthly_panel, freeze_after_year
 
 logger = setup_logging("build_panel")
 config = load_yaml(PROJECT_CONFIG)
@@ -16,7 +16,7 @@ panel.to_parquet(PROCESSED / "municipality_month_panel.parquet", index=False)
 panel["month_sin"] = __import__("numpy").sin(2 * __import__("numpy").pi * panel["month"] / 12)
 panel["month_cos"] = __import__("numpy").cos(2 * __import__("numpy").pi * panel["month"] / 12)
 panel["time_index"] = (panel["year"] - min(config["years"])) * 12 + panel["month"] - 1
-frozen = freeze_post_2022_features(panel)
+frozen = freeze_after_year(panel, max(config["train_years"]))
 frozen.to_parquet(PROCESSED / "municipality_month_panel_frozen.parquet", index=False)
 panel.to_parquet(PROCESSED / "modeling_panel.parquet", index=False)
 frozen.to_parquet(PROCESSED / "modeling_panel_frozen.parquet", index=False)

@@ -1,0 +1,31 @@
+{
+  "scope": "Ciudad de México, 16 alcaldías",
+  "features": [
+    "lag_1",
+    "mean_lag_12",
+    "spatial_lag_1",
+    "month_sin",
+    "month_cos",
+    "time_index",
+    "geo_id"
+  ],
+  "observed_through": "2025-12",
+  "train_years": [
+    2018,
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "test_years": [
+    2024,
+    2025
+  ],
+  "forecast_start": "2026-11",
+  "forecast_end": "2027-10",
+  "forecast_horizon_months": 12,
+  "recursive_bridge_months": 10,
+  "capacity_scenario": "34 hospitales con al menos un servicio de urgencias marcado en cartera SEDESA 2025; coordenadas CLUES agosto 2026",
+  "seed": 42
+}

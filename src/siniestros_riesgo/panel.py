@@ -32,12 +32,17 @@ def build_monthly_panel(events: pd.DataFrame, years: list[int]) -> pd.DataFrame:
     return panel
 
 
-def freeze_post_2022_features(panel: pd.DataFrame) -> pd.DataFrame:
-    """Create a two-year holdout view whose autoregressive features stop at 2022."""
+def freeze_after_year(panel: pd.DataFrame, cutoff_year: int) -> pd.DataFrame:
+    """Create a holdout view whose autoregressive features stop at a cutoff year."""
     result = panel.copy()
-    cutoff = result["year"].le(2022)
+    cutoff = result["year"].le(cutoff_year)
     history = result.loc[cutoff].groupby("geo_id")["victim_crashes"].tail(12).groupby(result.loc[cutoff, "geo_id"]).mean()
-    mask = result["year"].ge(2023)
+    mask = result["year"].gt(cutoff_year)
     result.loc[mask, "mean_lag_12"] = result.loc[mask, "geo_id"].map(history)
     result.loc[mask, "lag_1"] = result.loc[mask, "geo_id"].map(history)
     return result
+
+
+def freeze_post_2022_features(panel: pd.DataFrame) -> pd.DataFrame:
+    """Backward-compatible wrapper for the original 2023-2024 evaluation."""
+    return freeze_after_year(panel, 2022)
