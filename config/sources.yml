@@ -1,0 +1,43 @@
+# No se incluyen URLs inventadas. Complete únicamente con páginas/archivos oficiales verificados.
+sources:
+  atus:
+    provider: INEGI
+    landing_page: https://www.inegi.org.mx/programas/accidentes/
+    metadata_identifier: MEX-INEGI.40.302.03-ATUS-1997-2025
+    metadata_modified: 2026-08-28
+    years_used: [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+    license: https://www.inegi.org.mx/inegi/terminos.html
+  atus_georeferenced:
+    provider: INEGI
+    landing_page: https://www.inegi.org.mx/programas/accidentes/
+    download_pattern: https://www.inegi.org.mx/contenidos/programas/accidentes/datosabiertos/atus_{year}_shp.zip
+    years_used: [2019, 2020, 2021, 2022, 2023, 2024]
+    downloaded: 2026-10-22
+    note: La publicación georreferenciada 2025 aún no estaba disponible al corte.
+    license: https://www.inegi.org.mx/inegi/terminos.html
+  census_2020:
+    provider: INEGI
+    url: https://gaia.inegi.org.mx/wscatgeo/v2/mgem/
+    note: Población municipal expuesta por el Servicio Web del Catálogo Único; usada como contexto fijo.
+    license: https://www.inegi.org.mx/inegi/terminos.html
+  road_network:
+    provider: INEGI - Red Nacional de Caminos
+    url: null
+    license: TODO
+  clues:
+    provider: Secretaría de Salud
+    url: https://gobi.salud.gob.mx/Bases_Clues.html
+    snapshots: [202412, 202608]
+    downloaded: 2026-10-22
+    note: Agosto de 2026 era el último archivo 2026 que respondía correctamente al corte.
+  sedesa_emergency_portfolio:
+    provider: Secretaría de Salud Pública de la Ciudad de México
+    landing_page: https://www.salud.cdmx.gob.mx/ver-mas/unidades/hospitales
+    file: https://salud.cdmx.gob.mx/storage/app/media/2025/Centros%20de%20Salud/CONCENTRADO%20CARTERA%20SERVICIOS%20HOSPITALES%202o%20NIVEL.xlsx
+    downloaded: 2026-10-22
+    note: Se considera hospital con urgencias cuando al menos una de las tres columnas de urgencias está marcada.
+  municipal_boundaries:
+    provider: INEGI
+    url: https://gaia.inegi.org.mx/wscatgeo/v2/geo/mgem/
+    note: Se descargaron polígonos únicamente para las 16 demarcaciones de Ciudad de México.
+    license: https://www.inegi.org.mx/inegi/terminos.html

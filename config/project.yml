@@ -1,0 +1,43 @@
+seed: 42
+years: [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+train_years: [2018, 2019, 2020, 2021, 2022]
+test_years: [2023, 2024]
+grid_train_years: [2020, 2021, 2022]
+target_count: victim_crashes
+target_binary: any_victim_crash
+bootstrap_repetitions: 1000
+top_shares: [0.05, 0.10]
+coverage_threshold_minutes: [10, 15]
+candidate_bases: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+spatial:
+  weights: queen
+  fallback_k_neighbors: 8
+  row_standardize: true
+  p_adjustment: benjamini_hochberg
+columns:
+  # TODO: completar por edición después de validar los diccionarios ATUS.
+  event_id: ID
+  year: ANIO
+  month: MES
+  day: DIA
+  event_date: null
+  state_code: EDO
+  municipality_code: MPIO
+  deaths_total: TOTMUERTOS
+  injuries_total: TOTHERIDOS
+  longitude: LONGITUD
+  latitude: LATITUD
+  zero_certificate: null
+annual_columns:
+  geo_id: CVEGEO
+  state_code: CVE_ENT
+  municipality_code: CVE_MUN
+  year: ANIO
+  month: MES
+  day: ID_DIA
+  hour: ID_HORA
+  weekday: DIASEMANA
+  status: ESTATUS
+  crash_class: CLASACC
+  death_fields: [CONDMUERTO, PASAMUERTO, PEATMUERTO, CICLMUERTO, OTROMUERTO, NEMUERTO]
+  injury_fields: [CONDHERIDO, PASAHERIDO, PEATHERIDO, CICLHERIDO, OTROHERIDO, NEHERIDO]

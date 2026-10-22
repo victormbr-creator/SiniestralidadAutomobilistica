@@ -3,20 +3,22 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "siniestros-viales-mx"
+name = "siniestros-riesgo-mx"
 version = "0.1.0"
-description = "Análisis reproducible de severidad de siniestros viales en México"
+description = "Pipeline espacio-temporal de siniestros viales con víctimas en México"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "pandas>=2.1", "numpy>=1.26", "scikit-learn>=1.4", "xgboost>=2.0",
-  "shap>=0.44", "matplotlib>=3.8", "geopandas>=0.14", "libpysal>=4.9",
-  "esda>=2.5", "pyarrow>=14", "requests>=2.31", "jupyter>=1.0",
-  "streamlit>=1.30"
+  "pandas>=2.1,<4", "numpy>=1.26,<3", "pyarrow>=14",
+  "scikit-learn>=1.4,<2", "statsmodels>=0.14,<1", "xgboost>=2,<4",
+  "shap>=0.44,<1", "geopandas>=0.14,<2", "libpysal>=4.9,<5",
+  "esda>=2.5,<3", "networkx>=3.2,<4", "matplotlib>=3.8,<4",
+  "reportlab>=4,<5", "pypdf>=4,<7", "requests>=2.31,<3",
+  "PyYAML>=6,<7", "joblib>=1.3,<2", "openpyxl>=3.1,<4"
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8,<10"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,0 +1,5 @@
+source,year,canonical_variable,original_variable,type_or_codes,document_reference,harmonization,review_status
+ATUS anual,2018-2024,geo_id,CVEGEO,char(5),diccionario_de_datos_atus_anual_1997_2025.csv,conservar como texto,verified
+ATUS anual,2018-2024,deaths_total,"CONDMUERTO+PASAMUERTO+PEATMUERTO+CICLMUERTO+OTROMUERTO+NEMUERTO",integer,diccionario_de_datos_atus_anual_1997_2025.csv,suma por registro,verified
+ATUS anual,2018-2024,injuries_total,"CONDHERIDO+PASAHERIDO+PEATHERIDO+CICLHERIDO+OTROHERIDO+NEHERIDO",integer,diccionario_de_datos_atus_anual_1997_2025.csv,suma por registro,verified
+ATUS anual,2018-2024,report_status,not_available,category,metadatos_atus_anual_1997_2025.txt,certificados cero eliminados en publicación 2026,verified
