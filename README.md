@@ -4,7 +4,7 @@ Pipeline reproducible para predecir siniestros viales con personas heridas o fal
 
 ## Estado actual
 
-ATUS anual 2018-2025 fue procesado, pero el análisis sustantivo usa exclusivamente registros de Ciudad de México. La unidad predictiva es alcaldía-mes. El proyecto incorpora ATUS georreferenciado 2019-2024, CLUES, la cartera SEDESA 2025 y recursos SINERHIAS 2026. Los 34 hospitales con urgencias fueron vinculados por CLUES con camas, personal y equipo.
+ATUS anual 2018-2025 fue procesado, pero el análisis sustantivo usa exclusivamente registros de Ciudad de México. La unidad predictiva es alcaldía-mes. El proyecto incorpora ATUS georreferenciado 2019-2024, CLUES, la cartera SEDESA 2025, recursos SINERHIAS 2026 y el flujo oficial de urgencias DGIS/SINBA 2018-2025. Los 34 hospitales con urgencias fueron vinculados por CLUES con camas, personal, equipo y atenciones observadas.
 
 ## Unidad y diseño
 
@@ -17,6 +17,8 @@ ATUS anual 2018-2025 fue procesado, pero el análisis sustantivo usa exclusivame
 - Mapa puntual observado de 8,820 siniestros con víctimas, 2019-2024.
 - Distancia directa desde cada siniestro al hospital con urgencias verificado más cercano.
 - Presión vial proyectada por cama de urgencias, médico urgenciólogo y enfermería.
+- Flujo observado exclusivamente de urgencias: atenciones, urgencias calificadas, ingresos, traslados, defunciones y horas de estancia.
+- Atenciones de urgencias por cama y ocupación aproximada basada en horas registradas de cama de observación o choque.
 - Secuencia de hospitales adicionales mediante una cuadrícula de 1 km y criterio de equidad territorial.
 
 ## Instalación
@@ -35,8 +37,8 @@ En macOS, XGBoost suele requerir `brew install libomp`. Las dependencias geoespa
 1. Complete `config/sources.yml`, `config/project.yml` y `data/schema_changes.csv` con documentación verificada.
 2. Copie descargas originales a `data/raw/` sin modificarlas y complete `data/README.md`.
 3. Ejecute `make validate` y corrija todos los bloqueos.
-4. Ejecute `make prepare panel geospatial spatial train pressure report`, o `make all`.
-5. Ejecute `make train report` y revise las tablas `cdmx_*`, las figuras CDMX y el PDF final.
+4. Ejecute `make prepare panel geospatial spatial train pressure emergency-flow report`, o `make all`.
+5. Revise las tablas `cdmx_*`, las figuras CDMX y el PDF final.
 
 Cada comando escribe logs en `outputs/logs/`. Los scripts se ejecutan desde la raíz y no utilizan rutas absolutas.
 
@@ -55,6 +57,6 @@ Se comparan promedio móvil de 12 meses, binomial negativa, Random Forest y XGBo
 
 ## Límites sustantivos
 
-ATUS excluye carreteras federales; la ausencia de registros no prueba ausencia de siniestros. La población censal 2020 es fija. El mapa puntual es histórico y la predicción conserva resolución de alcaldía. La incertidumbre aumenta con cada mes recursivo entre el último dato observado y el horizonte objetivo. Las distancias a hospitales son euclidianas y no equivalen a tiempo de ambulancia. La presión mide carga vial predicha por recurso, no ocupación observada. El cubo SINBA por unidad no ofrece una descarga reproducible moderna. La red analizada cubre SEDESA/IMSS-Bienestar y no incluye todo IMSS, ISSSTE, sector privado, Cruz Roja ni bases de ambulancias.
+ATUS excluye carreteras federales; la ausencia de registros no prueba ausencia de siniestros. La población censal 2020 es fija. El mapa puntual es histórico y la predicción conserva resolución de alcaldía. La incertidumbre aumenta con cada mes recursivo entre el último dato observado y el horizonte objetivo. Las distancias a hospitales son euclidianas y no equivalen a tiempo de ambulancia. El flujo DGIS describe atenciones registradas y no contiene el origen geográfico preciso del paciente. La ocupación calculada es aproximada y no sustituye censos horarios ni tiempos de espera. La red analizada cubre SEDESA/IMSS-Bienestar y no incluye todo IMSS, ISSSTE, sector privado, Cruz Roja ni bases de ambulancias.
 
 La definición completa de entrenamiento, pandemia, presión y ubicación está en [`docs/metodologia_actualizada.md`](docs/metodologia_actualizada.md).

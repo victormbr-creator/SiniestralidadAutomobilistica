@@ -27,7 +27,7 @@ En la ejecución documentada, XGBoost con profundidad 2 obtuvo el menor MAE medi
 
 Los predictores son rezago de un mes, promedio de doce meses, rezago de alcaldías contiguas, estacionalidad mensual, tendencia e identidad de alcaldía. Se excluyen variables sin cobertura mensual homogénea, variables conocidas después del siniestro y datos de otros estados.
 
-## Capacidad de urgencias
+## Capacidad y flujo de urgencias
 
 La cartera SEDESA 2025 identifica 34 hospitales con al menos un servicio de urgencias. Todos se vincularon uno a uno por CLUES con SINERHIAS. Para IMSS-Bienestar, los recursos tienen corte al 15 de mayo de 2026. Se conservan por separado:
 
@@ -48,7 +48,35 @@ P^{enf}_a = \frac{D_a}{E_a}
 
 donde \(D_a\) es el número predicho de siniestros con víctimas en la alcaldía, \(C^{urg}_a\) sus camas de urgencias, \(M^{urg}_a\) sus médicos urgenciólogos y \(E_a\) su enfermería en contacto. Un denominador cero se reporta como dato no calculable y no se imputa.
 
-El cubo SINBA 2025 confirma que existen atenciones por unidad y CLUES, pero su publicación depende de Microsoft Office Web Components y una conexión nativa de Analysis Services. No hay una descarga CSV ni un endpoint HTTP reproducible. Por ello no se afirma ocupación, saturación ni utilización observada. `data/raw/sinba/cube_metadata.json` registra la información verificable y la limitación.
+DGIS publica los registros nacionales anuales de urgencias en archivos ZIP. Se usan exclusivamente las tablas `URGENCIAS` de 2018-2025; se excluyen los módulos de afecciones, medicamentos, procedimientos, consulta externa y egresos. Los archivos se leen secuencialmente sin extraerlos. El vínculo por CLUES conserva la clave actual y la clave anterior del catálogo oficial para seguir los 34 hospitales a través del cambio institucional a IMSS-Bienestar. El repositorio conserva agregados mensuales por hospital, no los microdatos nacionales.
+
+La cobertura por año se publica de forma explícita: 31 hospitales registraron atenciones en 2018-2020, 33 en 2021 y los 34 en 2022-2025. Una ausencia histórica no se convierte en atención cero.
+
+Para 2025 se calculan, por hospital y alcaldía:
+
+- atenciones de urgencias totales, calificadas y no calificadas;
+- motivo de atención por accidentes, envenenamientos o violencia, sin interpretarlo como siniestro vial;
+- uso registrado de cama de observación o choque;
+- ingresos hospitalarios, traslados y defunciones en urgencias;
+- horas registradas de estancia y horas en cama para los registros con duración válida.
+
+El flujo observado por cama es
+
+\[
+F^{cama}_h = \frac{U_h}{C^{urg}_h},
+\]
+
+donde \(U_h\) son las atenciones de urgencias de 2025. Como indicador complementario se calcula
+
+\[
+O^{proxy}_h = \frac{H^{cama}_h}{C^{urg}_h\,24\,365},
+\]
+
+donde \(H^{cama}_h\) suma la estancia registrada de atenciones con cama de observación o choque. Es una ocupación aproximada: no observa censos horarios, camas cerradas, espera, personal por turno ni simultaneidad. Los valores faltantes y códigos `999:99` no se imputan.
+
+La presión vial proyectada y el flujo asistencial observado se mantienen separados. La primera aproxima demanda futura atribuible al riesgo vial; el segundo describe toda la actividad registrada en urgencias, cualquiera que sea su causa.
+
+Para priorizar ampliaciones en hospitales existentes, cada razón por cama se transforma en percentil dentro de la red y se promedian ambos percentiles. Este `dual_pressure_score` identifica unidades con flujo total alto y exposición vial futura alta sin sumar pacientes y siniestros en una unidad artificial. Se publica como tamizaje; la inversión exige comprobar turnos, ocupación censada y capacidad efectiva.
 
 ## Demanda puntual y accesibilidad
 
@@ -66,6 +94,8 @@ Los candidatos son centros de una cuadrícula de 1 km dentro de CDMX y al menos 
 
 También se reporta una alternativa de eficiencia que minimiza la distancia media ponderada de toda la ciudad. Para dimensionar cada unidad nueva se usa un escenario explícito igual a la mediana de los 34 hospitales actuales: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Es un escenario comparativo, no un programa médico-arquitectónico.
 
+El flujo observado se usa para identificar hospitales actuales que requieren ampliación o revisión operativa. No se asigna ese flujo a las coordenadas candidatas porque los archivos abiertos no incluyen el origen geográfico preciso del paciente. La ubicación de una unidad nueva continúa guiada por la accesibilidad de los puntos de siniestros y el pronóstico territorial; así se evita atribuir a una colonia la demanda observada únicamente en el hospital receptor.
+
 ## Criterio de decisión
 
 La secuencia recomendada se acepta para estudio de factibilidad si reduce el peor P90 territorial y la proporción de demanda a más de 5 km. La decisión final requiere añadir tiempos por red vial y hora del día, disponibilidad de predios, población flotante, unidades IMSS/ISSSTE/privadas, bases de ambulancias, ocupación observada y costos.
@@ -73,8 +103,13 @@ La secuencia recomendada se acepta para estudio de factibilidad si reduce el peo
 ## Productos reproducibles
 
 - `outputs/tables/cdmx_emergency_hospital_capacity_2026.csv`
+- `outputs/tables/cdmx_emergency_flow_monthly_2018_2025.csv`
+- `outputs/tables/cdmx_emergency_flow_coverage.csv`
+- `outputs/tables/cdmx_hospital_observed_emergency_pressure_2025.csv`
+- `outputs/tables/cdmx_borough_observed_emergency_flow_2025.csv`
 - `outputs/tables/cdmx_borough_hospital_pressure_future.csv`
 - `outputs/tables/cdmx_hospital_pressure_future.csv`
 - `outputs/tables/cdmx_new_hospital_candidates.csv`
 - `outputs/figures/cdmx_hospital_pressure.png`
+- `outputs/figures/cdmx_observed_emergency_flow_pressure.png`
 - `outputs/figures/cdmx_new_hospital_locations.png`

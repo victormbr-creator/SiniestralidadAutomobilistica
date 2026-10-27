@@ -16,7 +16,10 @@
     "motivo de atención"
   ],
   "measure_confirmed": "Urgencias",
-  "extraction_status": "metadata_only",
-  "reason": "El portal publica el cubo mediante Microsoft Office Web Components y una conexión nativa de Analysis Services; no ofrece descarga CSV ni endpoint HTTP reproducible por unidad.",
-  "use_in_model": "No se usa para estimar ocupación. La presión publicada por este repositorio es demanda vial predicha por recurso SINERHIAS, no presión asistencial observada."
+  "open_data_index": "http://www.dgis.salud.gob.mx/contenidos/basesdedatos/da_urgencias_gobmx.html",
+  "years_extracted": "2018-2025",
+  "table_extracted": "URGENCIAS",
+  "extraction_status": "official_open_data_aggregated",
+  "aggregation": "hospital CLUES by statistical year and month for the 34 CDMX emergency hospitals",
+  "use_in_model": "Observed emergency flow is reported separately from projected road-crash pressure. Bed occupancy is an explicit proxy based on valid recorded stay hours for observation or shock-bed visits."
 }

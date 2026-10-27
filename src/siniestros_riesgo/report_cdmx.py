@@ -63,6 +63,8 @@ def build_cdmx_report(output: Path = REPORTS / "resultados_proyecto.pdf") -> Pat
     access = pd.read_csv(TABLES / "cdmx_accident_emergency_access.csv", dtype={"geo_id": "string"})
     hospitals = pd.read_csv(TABLES / "cdmx_emergency_hospital_capacity_2026.csv", dtype={"geo_id": "string"})
     pressure = pd.read_csv(TABLES / "cdmx_borough_hospital_pressure_future.csv", dtype={"geo_id": "string"})
+    observed_flow = pd.read_csv(TABLES / "cdmx_borough_observed_emergency_flow_2025.csv", dtype={"geo_id": "string"})
+    flow_coverage = pd.read_csv(TABLES / "cdmx_emergency_flow_coverage.csv")
     recommendations = pd.read_csv(TABLES / "cdmx_new_hospital_candidates.csv", dtype={"geo_id": "string"})
 
     model_names = {"random_forest": "Random Forest Poisson", "xgboost_poisson": "XGBoost Poisson", "negative_binomial": "Binomial negativa", "baseline": "Promedio móvil"}
@@ -80,6 +82,7 @@ def build_cdmx_report(output: Path = REPORTS / "resultados_proyecto.pdf") -> Pat
             ["Modelo futuro", model_names[selected]],
             ["Horizonte", forecast_label],
             ["Capacidad", f"{len(hospitals)} hospitales; recursos SINERHIAS 2026"],
+            ["Flujo asistencial", f"urgencias 2018-2025; {int(observed_flow.emergency_visits.sum()):,} atenciones en 2025"],
         ], [4.2 * cm, 11.8 * cm]),
         Spacer(1, .8 * cm),
         Paragraph("El estudio es predictivo y de planeación. Las asociaciones no son efectos causales y las coordenadas propuestas requieren factibilidad técnica.", styles["NoteMX"]),
@@ -104,6 +107,17 @@ def build_cdmx_report(output: Path = REPORTS / "resultados_proyecto.pdf") -> Pat
         Paragraph(f"Tabla 2. En la prueba final, {model_names[test_best.model]} logró el menor MAE ({test_best.mae:.3f}). Ese resultado se reporta como diagnóstico y no reemplaza la regla de selección predefinida.", styles["NoteMX"]),
         PageBreak(),
     ])
+
+    observed_top = observed_flow.sort_values("observed_flow_pressure_rank").head(8)
+    observed_table = [["Rango", "Alcaldía", "Urgencias 2025", "Camas urg.", "Atenciones/cama", "Calificadas"]] + [[
+        str(int(r.observed_flow_pressure_rank)), r.alcaldia, f"{int(r.emergency_visits):,}",
+        str(int(r.emergency_beds)), f"{r.emergency_visits_per_bed:,.0f}",
+        f"{r.qualified_emergency_share:.1%}",
+    ] for r in observed_top.itertuples()]
+    flow_total = int(observed_flow.emergency_visits.sum())
+    flow_start = int(flow_coverage.year.min())
+    flow_end = int(flow_coverage.year.max())
+    flow_top = observed_top.iloc[0]
 
     victim_points = int(geocoverage.siniestros_con_victimas_y_coordenadas.sum())
     victim_total = int(geocoverage.siniestros_con_victimas.sum())
@@ -152,35 +166,57 @@ def build_cdmx_report(output: Path = REPORTS / "resultados_proyecto.pdf") -> Pat
         PageBreak(),
     ])
 
+    story.extend([
+        Paragraph("5. Flujo observado exclusivamente de urgencias", styles["SectionMX"]),
+        Paragraph(
+            f"Los microdatos abiertos de DGIS/SINBA se procesaron de forma secuencial para {flow_start}-{flow_end}. "
+            f"Se conservaron únicamente registros del archivo URGENCIAS vinculados por CLUES a los 34 hospitales de la red. "
+            f"En 2025 suman {flow_total:,} atenciones. No se incorporaron consulta externa, egresos hospitalarios ni otros módulos.",
+            styles["BodyText"],
+        ),
+        Paragraph(
+            "La razón observada divide atenciones de urgencias entre camas de urgencias. La ocupación aproximada divide las horas "
+            "registradas en cama de observación o choque entre las horas-cama disponibles; es un indicador de planeación y no "
+            "sustituye censos horarios, tiempos de espera o disponibilidad operativa.",
+            styles["BodyText"],
+        ),
+        RLImage(str(FIGURES / "cdmx_observed_emergency_flow_pressure.png"), width=15.2 * cm, height=10.1 * cm),
+        Paragraph("Figura 6. Atenciones observadas de urgencias por cama de urgencias, agregadas por alcaldía.", styles["NoteMX"]),
+        Spacer(1, 7),
+        _table(observed_table, [1.1 * cm, 4.2 * cm, 2.8 * cm, 2.0 * cm, 2.8 * cm, 2.7 * cm], font_size=7.3),
+        Paragraph(f"Tabla 6. {flow_top.alcaldia} presenta la mayor razón observada dentro de la red analizada. Las razones reflejan tanto demanda como prácticas de registro y referencia.", styles["NoteMX"]),
+        PageBreak(),
+    ])
+
     equity = recommendations[recommendations.criterion.str.startswith("equity")].sort_values("recommended_order")
     efficiency = recommendations[recommendations.criterion.eq("efficiency_1")].iloc[0]
     location_table = [["Orden", "Alcaldía", "Latitud", "Longitud", "P90 antes", "P90 después", ">5 km después"]] + [[str(int(r.recommended_order)), r.alcaldia, f"{r.latitude:.6f}", f"{r.longitude:.6f}", f"{r.worst_borough_p90_before_km:.2f}", f"{r.worst_borough_p90_after_km:.2f}", f"{r.risk_share_beyond_5km_after:.2%}"] for r in equity.itertuples()]
     story.extend([
-        Paragraph("5. ¿Dónde ubicar el siguiente hospital?", styles["SectionMX"]),
+        Paragraph("6. ¿Dónde ubicar el siguiente hospital?", styles["SectionMX"]),
         Paragraph("La regla principal minimiza el peor percentil 90 de distancia entre alcaldías; en caso de empate minimiza la distancia media ponderada. Tras añadir cada hospital se vuelve a optimizar. Los candidatos son centros de celdas de 1 km dentro de CDMX y a por lo menos 2 km de la red actual.", styles["BodyText"]),
         RLImage(str(FIGURES / "cdmx_new_hospital_locations.png"), width=14.7 * cm, height=14.7 * cm),
-        Paragraph("Figura 6. Estrellas: secuencia recomendada por equidad. Rombo: alternativa de eficiencia global.", styles["NoteMX"]),
+        Paragraph("Figura 7. Estrellas: secuencia recomendada por equidad. Rombo: alternativa de eficiencia global.", styles["NoteMX"]),
         PageBreak(),
         Paragraph("Secuencia y capacidad de referencia", styles["SectionMX"]),
         _table(location_table, [1.1 * cm, 3.5 * cm, 2.4 * cm, 2.5 * cm, 2.1 * cm, 2.2 * cm, 2.4 * cm], font_size=7.4),
-        Paragraph(f"Tabla 6. Primero Milpa Alta y después Tlalpan. El peor P90 baja de {equity.iloc[0].worst_borough_p90_before_km:.2f} km a {equity.iloc[-1].worst_borough_p90_after_km:.2f} km. La alternativa de eficiencia está en {efficiency.alcaldia} ({efficiency.latitude:.6f}, {efficiency.longitude:.6f}) y reduce la distancia media de {efficiency.weighted_mean_distance_before_km:.2f} a {efficiency.weighted_mean_distance_after_km:.2f} km.", styles["NoteMX"]),
+        Paragraph(f"Tabla 7. Primero Milpa Alta y después Tlalpan. El peor P90 baja de {equity.iloc[0].worst_borough_p90_before_km:.2f} km a {equity.iloc[-1].worst_borough_p90_after_km:.2f} km. La alternativa de eficiencia está en {efficiency.alcaldia} ({efficiency.latitude:.6f}, {efficiency.longitude:.6f}) y reduce la distancia media de {efficiency.weighted_mean_distance_before_km:.2f} a {efficiency.weighted_mean_distance_after_km:.2f} km.", styles["NoteMX"]),
         Spacer(1, 8),
         Paragraph("El escenario para comparar una unidad nueva usa la mediana observada: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Sirve para dimensionar la prueba de localización; no sustituye un programa médico-arquitectónico.", styles["BodyText"]),
         Paragraph("Las coordenadas son centros de cuadrícula, no predios disponibles. Antes de invertir deben verificarse suelo, accesos, tiempos viales, población flotante, costos, ambulancias y capacidad de IMSS, ISSSTE, sector privado y Cruz Roja.", styles["BodyText"]),
     ])
 
     story.extend([
-        Paragraph("6. SINBA, límites y reproducibilidad", styles["SectionMX"]),
-        Paragraph("El cubo SINBA de urgencias 2025 contiene una medida de atenciones y dimensiones por unidad médica, CLUES, tipo de urgencia y afección principal. El portal la publica mediante Microsoft Office Web Components y conexión nativa de Analysis Services; no ofrece una descarga CSV ni un endpoint HTTP reproducible por unidad. Se registraron sus metadatos, pero no se usaron cifras de ocupación.", styles["BodyText"]),
-        Paragraph("Por ello, presión hospitalaria significa carga vial predicha por recurso disponible. No significa pacientes por cama, ocupación, tiempos de espera ni saturación. Cuando DGIS publique una extracción estable por CLUES, deberá agregarse atenciones anuales por hospital y calcular urgencias por cama y por turno.", styles["NoteMX"]),
+        Paragraph("7. Límites y reproducibilidad", styles["SectionMX"]),
+        Paragraph("DGIS publica archivos nacionales anuales de urgencias. El pipeline abre cada ZIP sin extraerlo, normaliza los cambios de esquema, vincula CLUES históricas y conserva únicamente agregados mensuales de la red CDMX. Los microdatos originales no se versionan por su tamaño y para evitar redistribuir registros individuales.", styles["BodyText"]),
+        Paragraph("Se distinguen dos medidas: presión vial futura por recurso y flujo asistencial observado por recurso. La ocupación aproximada usa horas registradas en camas de observación o choque. Ninguna de ellas mide espera, dotación por turno, cierre temporal de camas ni calidad de atención.", styles["NoteMX"]),
         Paragraph("Limitaciones principales", styles["SectionMX"]),
         Paragraph("La ubicación usa distancia euclidiana y patrones puntuales 2019-2024; el pronóstico conserva resolución de alcaldía. ATUS excluye carreteras federales. La red hospitalaria analizada no es todo el sistema de salud. El horizonte contiene meses puente y su incertidumbre aumenta con cada paso recursivo.", styles["BodyText"]),
         Paragraph("Fuentes y archivos", styles["SectionMX"]),
         Paragraph("Fuentes oficiales: INEGI ATUS anual 2018-2025 y georreferenciado 2019-2024; Secretaría de Salud, CLUES agosto de 2026; SEDESA, cartera hospitalaria 2025; DGIS, SINERHIAS y SINBA; INEGI, Marco Geoestadístico.", styles["BodyText"]),
-        Paragraph("Tablas reproducibles: cdmx_emergency_hospital_capacity_2026.csv, cdmx_borough_hospital_pressure_future.csv, cdmx_hospital_pressure_future.csv y cdmx_new_hospital_candidates.csv. La metodología completa está en docs/metodologia_actualizada.md.", styles["BodyText"]),
+        Paragraph("Tablas reproducibles: cdmx_emergency_flow_monthly_2018_2025.csv, cdmx_borough_observed_emergency_flow_2025.csv, cdmx_borough_hospital_pressure_future.csv y cdmx_new_hospital_candidates.csv. La metodología completa está en docs/metodologia_actualizada.md.", styles["BodyText"]),
         Paragraph("Conclusión", styles["SectionMX"]),
-        Paragraph(f"Para {forecast_label}, Cuauhtémoc encabeza la presión por cama de urgencias. Para cerrar la peor brecha territorial, la secuencia analítica propone primero Milpa Alta y después Tlalpan. Estas ubicaciones pasan a una fase de factibilidad vial, clínica, financiera y predial.", styles["BodyText"]),
-        Paragraph(f"Se generaron {len(forecast)} predicciones alcaldía-mes y se integraron recursos oficiales para {len(hospitals)} hospitales.", styles["NoteMX"]),
+        Paragraph(f"Para {forecast_label}, Cuauhtémoc encabeza la presión vial futura por cama; en el flujo observado de 2025, {flow_top.alcaldia} encabeza las atenciones de urgencias por cama. Para cerrar la peor brecha territorial, la secuencia analítica propone primero Milpa Alta y después Tlalpan. Estas ubicaciones pasan a una fase de factibilidad vial, clínica, financiera y predial.", styles["BodyText"]),
+        Paragraph(f"Se generaron {len(forecast)} predicciones alcaldía-mes, se agregaron {flow_total:,} atenciones de urgencias de 2025 y se integraron recursos oficiales para {len(hospitals)} hospitales.", styles["NoteMX"]),
     ])
     doc.build(story)
     return output

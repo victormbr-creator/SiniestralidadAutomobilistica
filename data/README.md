@@ -17,7 +17,7 @@ Este repositorio no contiene datos originales. `data/raw/` recibe copias sin mod
 | Polígonos de alcaldías CDMX | consulta 2026-10-22 | `data/external/cdmx_alcaldias_inegi.geojson` | https://gaia.inegi.org.mx/wscatgeo/v2/geo/mgem/09 | 2026-10-22 | Términos INEGI | TODO | Mapa del horizonte futuro | Solo CDMX |
 | Infraestructura de salud por alcaldía | 2020 | `data/raw/infraestructura_salud_alcaldias_cdmx_2020.csv` | URL SEDECO/CDMX consignada dentro del CSV | Incorporado 2026-10-22 | TODO: verificar términos del anexo | `b4661f2d8eed3006b6a04757b6069107b8583f26b8fdefebeff9f3393ea9126f` | Brecha relativa riesgo-capacidad | Red SEDESA; no inventario completo de urgencias ni de IMSS/ISSSTE |
 | SINERHIAS, recursos por establecimiento | corte IMSS-Bienestar 2026-05-15 | `data/raw/sinerhias/unidades_cdmx_2026.json` | https://radarcisalud.salud.gob.mx/sinerhias/map_geo/sinerhias_rpe.php | 2026-10-27 | Portal público DGIS | `442ec51b94ad5925fefa2036232d581b189380f3dc242b917c60748db1b6feb6` | Filtro oficial CDMX; unión exacta por CLUES | Recursos SSA/IMB al 2026-05-15; IMSS/ISSSTE/PEMEX al 2025-12-31 |
-| SINBA, cubo de urgencias | 2025 | `data/raw/sinba/cube_metadata.json` | https://sinba.salud.gob.mx/cuboURGENCIAS/urgencias2025 | 2026-10-27 | Portal público DGIS | Véase manifiesto | Metadatos y dimensiones verificadas | Sin CSV o endpoint HTTP reproducible por unidad; no usado como ocupación observada |
+| DGIS/SINBA, datos abiertos de urgencias | 2018-2025 | `data/raw/sinba/urgencias/Urgencias_*.zip` | http://www.dgis.salud.gob.mx/contenidos/basesdedatos/da_urgencias_gobmx.html | 2026-10-27 | Portal público DGIS | Véase manifiesto | Lectura secuencial; vínculo de CLUES actual/anterior; agregación hospital-mes | Solo tabla URGENCIAS y 34 hospitales; microdatos no versionados |
 
 ## Reglas
 
@@ -35,6 +35,8 @@ Los seis productos georreferenciados contienen coordenadas, calle, fecha, hora, 
 La cartera SEDESA contiene 34 hospitales con al menos un tipo de urgencias marcado. Se vincularon uno a uno con CLUES agosto de 2026. La cobertura calculada es distancia euclidiana desde siniestros observados y no equivale a tiempo de viaje o respuesta.
 
 Los mismos 34 hospitales coincidieron exactamente por CLUES con SINERHIAS: se incorporaron camas de urgencias, camas censables y no censables, médicos, enfermería, ambulancias, quirófanos y tomógrafos. Los indicadores conservan denominadores separados; no suman recursos heterogéneos. La ubicación de unidades nuevas usa puntos de demanda histórica ponderados por el pronóstico futuro y se documenta en `docs/metodologia_actualizada.md`.
+
+Los archivos abiertos DGIS/SINBA 2018-2025 se procesan directamente desde sus ZIP. Solo se lee la tabla principal de urgencias y se filtran las CLUES actuales o anteriores de los 34 hospitales. El producto versionado es un agregado mensual sin registros individuales. La duración inválida o no especificada (`999:99`) no se imputa. El flujo incluye todas las causas atendidas en urgencias; el motivo combinado de accidentes, envenenamientos y violencia no se interpreta como accidente vial.
 
 ### SHA-256 de las nuevas fuentes
 

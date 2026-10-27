@@ -57,3 +57,12 @@ tmp/
 !data/raw/sinerhias/unidades_cdmx_2026.json
 !data/raw/sinba/
 !data/raw/sinba/cube_metadata.json
+data/raw/sinba/urgencias/
+
+# Agregados de urgencias sin microdatos nacionales.
+!data/processed/cdmx_emergency_flow_monthly_2018_2025.parquet
+!outputs/figures/cdmx_observed_emergency_flow_pressure.png
+!outputs/tables/cdmx_emergency_flow_monthly_2018_2025.csv
+!outputs/tables/cdmx_emergency_flow_coverage.csv
+!outputs/tables/cdmx_hospital_observed_emergency_pressure_2025.csv
+!outputs/tables/cdmx_borough_observed_emergency_flow_2025.csv

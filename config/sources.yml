@@ -36,6 +36,13 @@ sources:
     file: https://salud.cdmx.gob.mx/storage/app/media/2025/Centros%20de%20Salud/CONCENTRADO%20CARTERA%20SERVICIOS%20HOSPITALES%202o%20NIVEL.xlsx
     downloaded: 2026-10-22
     note: Se considera hospital con urgencias cuando al menos una de las tres columnas de urgencias está marcada.
+  dgis_emergency_open_data:
+    provider: Secretaría de Salud - DGIS/SINBA
+    landing_page: http://www.dgis.salud.gob.mx/contenidos/basesdedatos/da_urgencias_gobmx.html
+    years_used: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    downloaded: 2026-10-27
+    table_used: URGENCIAS
+    note: Se filtran las CLUES actuales y anteriores de los 34 hospitales; se versionan solo agregados mensuales.
   municipal_boundaries:
     provider: INEGI
     url: https://gaia.inegi.org.mx/wscatgeo/v2/geo/mgem/
