@@ -70,7 +70,23 @@ prep=ColumnTransformer([("num",Pipeline([("impute",SimpleImputer(strategy="media
 candidates={
  "random_forest":[RandomForestRegressor(n_estimators=300,min_samples_leaf=m,criterion="poisson",n_jobs=-1,random_state=SEED) for m in (2,5,10)],
  "xgboost_poisson":[XGBRegressor(objective="count:poisson",n_estimators=300,max_depth=d,learning_rate=.04,subsample=.85,colsample_bytree=.85,n_jobs=-1,random_state=SEED) for d in (2,3,4)]}
-validation=[]; selected={}
+
+def nb_frame(data):
+    transformed=data.copy()
+    for col in ("lag_1","mean_lag_12","spatial_lag_1"):
+        transformed["log_"+col]=np.log1p(transformed[col].fillna(0).clip(lower=0))
+    return transformed
+
+def fit_nb(data):
+    return smf.glm(
+        "victim_crashes ~ log_lag_1 + log_mean_lag_12 + log_spatial_lag_1 + month_sin + month_cos + time_index + C(geo_id)",
+        data=nb_frame(data), family=sm.families.NegativeBinomial(alpha=1),
+    ).fit(maxiter=100)
+
+def predict_nb(model,data):
+    return np.clip(np.asarray(model.predict(nb_frame(data))),0,None)
+
+validation=[]; selected={}; selected_options={}
 for name,options in candidates.items():
     means=[]
     for option,estimator in enumerate(options):
@@ -79,18 +95,29 @@ for name,options in candidates.items():
             fit=panel[panel.year<valid_year]; valid=panel[panel.year==valid_year]
             model=Pipeline([("prep",clone(prep)),("model",clone(estimator))]); model.fit(fit[features],fit.victim_crashes); score=mean_absolute_error(valid.victim_crashes,np.clip(model.predict(valid[features]),0,None)); scores.append(score); validation.append({"model":name,"option":option,"validation_year":valid_year,"mae":score})
         means.append(np.mean(scores))
-    selected[name]=options[int(np.argmin(means))]
-pd.DataFrame(validation).to_csv(TABLES/"cdmx_temporal_validation.csv",index=False)
+    chosen=int(np.argmin(means)); selected[name]=options[chosen]; selected_options[name]=chosen
+for valid_year in cfg["validation_years"]:
+    fit=panel[panel.year<valid_year]; valid=panel[panel.year==valid_year]
+    model=fit_nb(fit); score=mean_absolute_error(valid.victim_crashes,predict_nb(model,valid))
+    validation.append({"model":"negative_binomial","option":0,"validation_year":valid_year,"mae":score})
+validation_frame=pd.DataFrame(validation)
+selected_options["negative_binomial"]=0
+validation_frame["selected_option"]=[row.option==selected_options[row.model] for row in validation_frame.itertuples()]
+validation_frame.to_csv(TABLES/"cdmx_temporal_validation.csv",index=False)
+selected_forecast_model=(validation_frame[validation_frame.selected_option].groupby("model").mae.mean().sort_values().index[0])
+if selected_forecast_model=="random_forest":
+    selected_parameters={key:selected[selected_forecast_model].get_params()[key] for key in ("n_estimators","min_samples_leaf","criterion")}
+elif selected_forecast_model=="xgboost_poisson":
+    selected_parameters={key:selected[selected_forecast_model].get_params()[key] for key in ("n_estimators","max_depth","learning_rate","subsample","colsample_bytree","objective")}
+else:
+    selected_parameters={"family":"NegativeBinomial","alpha":1}
 
 train=panel[panel.year.isin(train_years)].copy(); test=frozen[frozen.year.isin(test_years)].copy(); predictions=test[["geo_id","nomgeo","year","month","victim_crashes"]].copy(); predictions["baseline"]=test.mean_lag_12.to_numpy()
 for name,estimator in selected.items():
     model=Pipeline([("prep",clone(prep)),("model",estimator)]); model.fit(train[features],train.victim_crashes); predictions[name]=np.clip(model.predict(test[features]),0,None); joblib.dump(model,MODELS/f"cdmx_{name}.joblib")
 # NB2 con rezagos logarítmicos para evitar extrapolación explosiva.
-nb_train=train.copy(); nb_test=test.copy()
-for col in ("lag_1","mean_lag_12","spatial_lag_1"):
-    nb_train["log_"+col]=np.log1p(nb_train[col].fillna(0).clip(lower=0)); nb_test["log_"+col]=np.log1p(nb_test[col].fillna(0).clip(lower=0))
-nb=smf.glm("victim_crashes ~ log_lag_1 + log_mean_lag_12 + log_spatial_lag_1 + month_sin + month_cos + time_index + C(geo_id)",data=nb_train,family=sm.families.NegativeBinomial(alpha=1)).fit(maxiter=100)
-predictions["negative_binomial"]=np.clip(np.asarray(nb.predict(nb_test)),0,None); joblib.dump(nb,MODELS/"cdmx_negative_binomial.joblib")
+nb=fit_nb(train)
+predictions["negative_binomial"]=predict_nb(nb,test); joblib.dump(nb,MODELS/"cdmx_negative_binomial.joblib")
 metrics=[]
 for name in ("baseline","negative_binomial","random_forest","xgboost_poisson"): metrics.append({"model":name,**count_metrics(predictions.victim_crashes.to_numpy(),predictions[name].to_numpy())})
 pd.DataFrame(metrics).to_csv(TABLES/"cdmx_test_metrics.csv",index=False); predictions.to_csv(TABLES/"cdmx_test_predictions.csv",index=False)
@@ -101,13 +128,18 @@ pd.DataFrame(boot).to_csv(TABLES/"cdmx_bootstrap_differences.csv",index=False)
 
 # Reajuste con toda la historia observada y proyección recursiva hasta el fin
 # del horizonte. Los meses entre el último dato y forecast_start son puente.
-final_model=Pipeline([("prep",clone(prep)),("model",clone(selected["xgboost_poisson"]))]); final_model.fit(panel[features],panel.victim_crashes)
+if selected_forecast_model=="negative_binomial":
+    final_model=fit_nb(panel)
+    def final_predict(frame): return predict_nb(final_model,frame)
+else:
+    final_model=Pipeline([("prep",clone(prep)),("model",clone(selected[selected_forecast_model]))]); final_model.fit(panel[features],panel.victim_crashes)
+    def final_predict(frame): return np.clip(final_model.predict(frame[features]),0,None)
 latest_observed=panel.date.max().to_period("M")
 if forecast_start<=latest_observed: raise SystemExit(f"El horizonte debe iniciar después de {latest_observed}")
 units=panel[["geo_id","nomgeo","population"]].drop_duplicates("geo_id").sort_values("geo_id"); histories={code:list(group.sort_values("date").victim_crashes.tail(12).astype(float)) for code,group in panel.groupby("geo_id")}; monthly=[]
 simulation_periods=pd.period_range(latest_observed+1,forecast_end,freq="M")
 for lead,period in enumerate(simulation_periods,start=1):
-    month=period.month; frame=units.copy(); frame["month"]=month; frame["year"]=period.year; frame["forecast_month"]=str(period); frame["lead_month_from_observed"]=lead; frame["forecast_role"]="bridge" if period<forecast_start else "target"; frame["lag_1"]=[histories[c][-1] for c in frame.geo_id]; frame["mean_lag_12"]=[np.mean(histories[c][-12:]) for c in frame.geo_id]; frame["spatial_lag_1"]=[np.mean([histories[n][-1] for n in neighbors[c]]) for c in frame.geo_id]; frame["month_sin"]=np.sin(2*np.pi*month/12); frame["month_cos"]=np.cos(2*np.pi*month/12); frame["time_index"]=(period.year-origin_year)*12+month-1; frame["predicted_victim_crashes"]=np.clip(final_model.predict(frame[features]),0,None); monthly.append(frame[["geo_id","nomgeo","population","year","month","forecast_month","lead_month_from_observed","forecast_role","predicted_victim_crashes"]]);
+    month=period.month; frame=units.copy(); frame["month"]=month; frame["year"]=period.year; frame["forecast_month"]=str(period); frame["lead_month_from_observed"]=lead; frame["forecast_role"]="bridge" if period<forecast_start else "target"; frame["lag_1"]=[histories[c][-1] for c in frame.geo_id]; frame["mean_lag_12"]=[np.mean(histories[c][-12:]) for c in frame.geo_id]; frame["spatial_lag_1"]=[np.mean([histories[n][-1] for n in neighbors[c]]) for c in frame.geo_id]; frame["month_sin"]=np.sin(2*np.pi*month/12); frame["month_cos"]=np.cos(2*np.pi*month/12); frame["time_index"]=(period.year-origin_year)*12+month-1; frame["predicted_victim_crashes"]=final_predict(frame); monthly.append(frame[["geo_id","nomgeo","population","year","month","forecast_month","lead_month_from_observed","forecast_role","predicted_victim_crashes"]]);
     for code,value in zip(frame.geo_id,frame.predicted_victim_crashes): histories[code].append(float(value))
 simulation=pd.concat(monthly,ignore_index=True); forecast=simulation[simulation.forecast_role.eq("target")].copy(); forecast["horizon_month"]=forecast.groupby("geo_id").cumcount()+1; forecast.to_csv(TABLES/"cdmx_monthly_forecast_future.csv",index=False)
 annual=forecast.groupby(["geo_id","nomgeo","population"],as_index=False).agg(predicted_horizon_victim_crashes=("predicted_victim_crashes","sum"),predicted_monthly_average=("predicted_victim_crashes","mean"))
@@ -138,6 +170,6 @@ for _,r in mapdata.iterrows(): p=r.geometry.representative_point(); ax.annotate(
 ax.set_title(f"Pronóstico por alcaldía\n{horizon_label}"); ax.axis("off"); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_risk_map_future.png",dpi=220,bbox_inches="tight"); plt.close(fig)
 rankplot=annual.sort_values("predicted_horizon_victim_crashes"); fig,ax=plt.subplots(figsize=(9,6)); ax.barh(rankplot.nomgeo,rankplot.predicted_horizon_victim_crashes,color="#B33A3A"); ax.set(title=f"Siniestros con víctimas predichos por alcaldía\n{horizon_label}",xlabel=f"Conteo predicho en {args.horizon_months} meses"); ax.grid(axis="x",alpha=.25); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_forecast_ranking_future.png",dpi=220,bbox_inches="tight"); plt.close(fig)
 plot=annual.sort_values("gap_verified_emergency"); fig,ax=plt.subplots(figsize=(9,6)); colors=np.where(plot.gap_verified_emergency>0,"#B33A3A","#3A7D44"); ax.barh(plot.nomgeo,plot.gap_verified_emergency*100,color=colors); ax.axvline(0,color="black",linewidth=.8); ax.set(title="Brecha relativa: riesgo predicho vs hospitales con urgencias",xlabel="Puntos porcentuales (participación en riesgo - participación en hospitales)"); ax.grid(axis="x",alpha=.25); fig.tight_layout(); fig.savefig(FIGURES/"cdmx_capacity_gap.png",dpi=220,bbox_inches="tight"); plt.close(fig)
-joblib.dump(final_model,MODELS/"cdmx_xgboost_refit_latest.joblib")
-(MODELS/"cdmx_manifest.json").write_text(json.dumps({"scope":"Ciudad de México, 16 alcaldías","features":features,"observed_through":str(latest_observed),"train_years":train_years,"test_years":test_years,"forecast_start":str(forecast_start),"forecast_end":str(forecast_end),"forecast_horizon_months":args.horizon_months,"recursive_bridge_months":max(0,len(simulation_periods)-args.horizon_months),"capacity_scenario":"34 hospitales con al menos un servicio de urgencias marcado en cartera SEDESA 2025; coordenadas CLUES agosto 2026","seed":SEED},ensure_ascii=False,indent=2),encoding="utf-8")
+joblib.dump(final_model,MODELS/"cdmx_forecast_refit_latest.joblib")
+(MODELS/"cdmx_manifest.json").write_text(json.dumps({"scope":"Ciudad de México, 16 alcaldías","features":features,"observed_through":str(latest_observed),"train_years":train_years,"validation_years":cfg["validation_years"],"test_years":test_years,"selected_forecast_model":selected_forecast_model,"selected_hyperparameters":selected_parameters,"model_selection_rule":"menor MAE medio en validación temporal progresiva con el mejor conjunto de hiperparámetros de cada familia; la prueba final 2024-2025 no selecciona el modelo","forecast_start":str(forecast_start),"forecast_end":str(forecast_end),"forecast_horizon_months":args.horizon_months,"recursive_bridge_months":max(0,len(simulation_periods)-args.horizon_months),"capacity_scenario":"34 hospitales con urgencias SEDESA 2025; recursos SINERHIAS al 15 de mayo de 2026 para IMSS-Bienestar","seed":SEED},ensure_ascii=False,indent=2),encoding="utf-8")
 logger.info("Análisis CDMX terminado: %d observaciones train, %d test",len(train),len(test))

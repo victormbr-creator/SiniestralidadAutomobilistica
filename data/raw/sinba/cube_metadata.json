@@ -1,0 +1,22 @@
+{
+  "source": "Secretaría de Salud, SINBA Cubos Dinámicos",
+  "topic": "Urgencias médicas",
+  "period": 2025,
+  "version_label": "DEFINITIVA",
+  "cutoff_date": "2026-04-01",
+  "publication_date": "2026-04-01",
+  "official_url": "https://sinba.salud.gob.mx/cuboURGENCIAS/urgencias2025",
+  "dimensions_confirmed": [
+    "unidad médica",
+    "CLUES",
+    "tipo de urgencia",
+    "afección principal",
+    "sexo",
+    "edad",
+    "motivo de atención"
+  ],
+  "measure_confirmed": "Urgencias",
+  "extraction_status": "metadata_only",
+  "reason": "El portal publica el cubo mediante Microsoft Office Web Components y una conexión nativa de Analysis Services; no ofrece descarga CSV ni endpoint HTTP reproducible por unidad.",
+  "use_in_model": "No se usa para estimar ocupación. La presión publicada por este repositorio es demanda vial predicha por recurso SINERHIAS, no presión asistencial observada."
+}

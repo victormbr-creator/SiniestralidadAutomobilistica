@@ -2,7 +2,7 @@ PYTHON ?= python3
 HORIZON_MONTHS ?= 12
 FORECAST_ARGS = --horizon-months $(HORIZON_MONTHS) $(if $(FORECAST_START),--forecast-start $(FORECAST_START),)
 
-.PHONY: install validate prepare panel geospatial quality spatial train evaluate results coverage report test all clean
+.PHONY: install validate prepare panel geospatial pressure quality spatial train evaluate results coverage report test all clean
 install:
 	$(PYTHON) -m pip install -e '.[dev]'
 validate:
@@ -13,6 +13,8 @@ panel:
 	$(PYTHON) scripts/build_panel.py
 geospatial:
 	$(PYTHON) scripts/prepare_cdmx_geospatial.py
+pressure:
+	$(PYTHON) scripts/build_hospital_pressure.py
 quality:
 	$(PYTHON) scripts/analyze_quality.py
 spatial:
@@ -29,6 +31,6 @@ report:
 	$(PYTHON) scripts/build_report.py
 test:
 	$(PYTHON) -m pytest -q
-all: validate prepare panel geospatial train report
+all: validate prepare panel geospatial train pressure report
 clean:
 	$(PYTHON) scripts/clean_outputs.py

@@ -2,7 +2,7 @@ seed: 42
 years: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
 train_years: [2018, 2019, 2020, 2021, 2022, 2023]
 test_years: [2024, 2025]
-validation_years: [2022, 2023]
+validation_years: [2021, 2022, 2023]
 forecast_horizon_months: 12
 grid_train_years: [2020, 2021, 2022]
 target_count: victim_crashes

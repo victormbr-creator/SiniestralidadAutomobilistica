@@ -27,6 +27,7 @@ tmp/
 !data/processed/cdmx_atus_georeferenced_2019_2024.parquet
 !data/processed/cdmx_victim_crash_points_with_emergency_distance.parquet
 !data/processed/cdmx_emergency_hospitals_sedesa_2025.parquet
+!data/processed/cdmx_emergency_hospital_capacity_2026.parquet
 !data/processed/cdmx_alcaldia_month_panel.parquet
 !data/processed/cdmx_alcaldia_month_panel_frozen.parquet
 !outputs/figures/cdmx_accident_points_emergency_hospitals.png
@@ -34,6 +35,8 @@ tmp/
 !outputs/figures/cdmx_forecast_ranking_future.png
 !outputs/figures/cdmx_capacity_gap.png
 !outputs/figures/cdmx_model_mae.png
+!outputs/figures/cdmx_hospital_pressure.png
+!outputs/figures/cdmx_new_hospital_locations.png
 !outputs/tables/cdmx_georeference_coverage.csv
 !outputs/tables/cdmx_emergency_hospitals_sedesa_2025.csv
 !outputs/tables/cdmx_accident_emergency_access.csv
@@ -43,4 +46,14 @@ tmp/
 !outputs/tables/cdmx_test_predictions.csv
 !outputs/tables/cdmx_temporal_validation.csv
 !outputs/tables/cdmx_bootstrap_differences.csv
+!outputs/tables/cdmx_borough_hospital_pressure_future.csv
+!outputs/tables/cdmx_emergency_hospital_capacity_2026.csv
+!outputs/tables/cdmx_hospital_pressure_future.csv
+!outputs/tables/cdmx_new_hospital_candidates.csv
 !outputs/models/cdmx_manifest.json
+
+# Copias oficiales pequeñas y metadatos necesarios para reproducir capacidad.
+!data/raw/sinerhias/
+!data/raw/sinerhias/unidades_cdmx_2026.json
+!data/raw/sinba/
+!data/raw/sinba/cube_metadata.json

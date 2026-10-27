@@ -18,14 +18,29 @@
     2022,
     2023
   ],
+  "validation_years": [
+    2021,
+    2022,
+    2023
+  ],
   "test_years": [
     2024,
     2025
   ],
+  "selected_forecast_model": "xgboost_poisson",
+  "selected_hyperparameters": {
+    "n_estimators": 300,
+    "max_depth": 2,
+    "learning_rate": 0.04,
+    "subsample": 0.85,
+    "colsample_bytree": 0.85,
+    "objective": "count:poisson"
+  },
+  "model_selection_rule": "menor MAE medio en validación temporal progresiva con el mejor conjunto de hiperparámetros de cada familia; la prueba final 2024-2025 no selecciona el modelo",
   "forecast_start": "2026-11",
   "forecast_end": "2027-10",
   "forecast_horizon_months": 12,
   "recursive_bridge_months": 10,
-  "capacity_scenario": "34 hospitales con al menos un servicio de urgencias marcado en cartera SEDESA 2025; coordenadas CLUES agosto 2026",
+  "capacity_scenario": "34 hospitales con urgencias SEDESA 2025; recursos SINERHIAS al 15 de mayo de 2026 para IMSS-Bienestar",
   "seed": 42
 }

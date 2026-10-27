@@ -1,66 +1,186 @@
-"""CDMX-only PDF report with alcaldía forecasts and SEDESA capacity scenario."""
+"""Definitive CDMX report: forecast, hospital pressure, and new locations."""
 
 import json
 from pathlib import Path
+
 import pandas as pd
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image as RLImage
+from reportlab.platypus import BaseDocTemplate, Frame, Image as RLImage, PageBreak, PageTemplate, Paragraph, Spacer, Table, TableStyle
 
 from .config import FIGURES, MODELS, REPORTS, TABLES
 
 
-def _footer(canvas,doc):
-    canvas.saveState(); canvas.setFont("Helvetica",8); canvas.setFillColor(colors.HexColor("#5B6573")); canvas.drawString(1.8*cm,1.1*cm,"Predicción de siniestros con víctimas por alcaldía - CDMX"); canvas.drawRightString(letter[0]-1.8*cm,1.1*cm,f"Página {doc.page}"); canvas.restoreState()
+def _footer(canvas, doc):
+    canvas.saveState()
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(colors.HexColor("#5B6573"))
+    canvas.drawString(1.8 * cm, 1.1 * cm, "Riesgo vial y capacidad de urgencias - CDMX")
+    canvas.drawRightString(letter[0] - 1.8 * cm, 1.1 * cm, f"Página {doc.page}")
+    canvas.restoreState()
 
 
-def _table(data,widths):
-    table=Table(data,colWidths=widths,repeatRows=1)
-    table.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#DCEEF0")),("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("GRID",(0,0),(-1,-1),.4,colors.HexColor("#A6B1BC")),("FONTSIZE",(0,0),(-1,-1),8),("VALIGN",(0,0),(-1,-1),"MIDDLE"),("PADDING",(0,0),(-1,-1),4)]))
+def _table(data, widths, font_size=8):
+    table = Table(data, colWidths=widths, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#DCEEF0")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), .4, colors.HexColor("#A6B1BC")),
+        ("FONTSIZE", (0, 0), (-1, -1), font_size),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("PADDING", (0, 0), (-1, -1), 4),
+    ]))
     return table
 
 
-def build_cdmx_report(output: Path=REPORTS/"resultados_proyecto.pdf") -> Path:
-    """Build the definitive CDMX alcaldía report."""
-    output.parent.mkdir(parents=True,exist_ok=True)
-    styles=getSampleStyleSheet(); styles.add(ParagraphStyle(name="TitleMX",parent=styles["Title"],fontName="Helvetica-Bold",fontSize=22,leading=27,textColor=colors.HexColor("#13315C"),alignment=TA_CENTER,spaceAfter=18)); styles.add(ParagraphStyle(name="SectionMX",parent=styles["Heading1"],fontName="Helvetica-Bold",fontSize=15,leading=19,textColor=colors.HexColor("#0B6E75"),spaceBefore=10,spaceAfter=7)); styles.add(ParagraphStyle(name="NoteMX",parent=styles["BodyText"],fontName="Helvetica-Oblique",fontSize=8.5,leading=11,textColor=colors.HexColor("#5B6573"))); styles["BodyText"].fontSize=10; styles["BodyText"].leading=14
-    frame=Frame(1.8*cm,1.7*cm,letter[0]-3.6*cm,letter[1]-3.4*cm,id="main"); doc=BaseDocTemplate(str(output),pagesize=letter,title="Riesgo vial y capacidad de atención por alcaldía, CDMX",author="Proyecto de políticas públicas",pageTemplates=[PageTemplate(id="main",frames=frame,onPage=_footer)])
-    manifest=json.loads((MODELS/"cdmx_manifest.json").read_text(encoding="utf-8")); forecast_start=manifest["forecast_start"]; forecast_end=manifest["forecast_end"]; horizon=manifest["forecast_horizon_months"]; observed_through=manifest["observed_through"]; train_years=manifest["train_years"]; test_years=manifest["test_years"]; bridge=manifest["recursive_bridge_months"]
-    months_es=("enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre")
+def build_cdmx_report(output: Path = REPORTS / "resultados_proyecto.pdf") -> Path:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="TitleMX", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=22, leading=27, textColor=colors.HexColor("#13315C"), alignment=TA_CENTER, spaceAfter=18))
+    styles.add(ParagraphStyle(name="SectionMX", parent=styles["Heading1"], fontName="Helvetica-Bold", fontSize=15, leading=19, textColor=colors.HexColor("#0B6E75"), spaceBefore=10, spaceAfter=7))
+    styles.add(ParagraphStyle(name="NoteMX", parent=styles["BodyText"], fontName="Helvetica-Oblique", fontSize=8.5, leading=11, textColor=colors.HexColor("#5B6573")))
+    styles["BodyText"].fontSize = 10
+    styles["BodyText"].leading = 14
+    frame = Frame(1.8 * cm, 1.7 * cm, letter[0] - 3.6 * cm, letter[1] - 3.4 * cm, id="main")
+    doc = BaseDocTemplate(str(output), pagesize=letter, title="Riesgo vial y capacidad de atención por alcaldía, CDMX", author="Proyecto de políticas públicas", pageTemplates=[PageTemplate(id="main", frames=frame, onPage=_footer)])
+
+    manifest = json.loads((MODELS / "cdmx_manifest.json").read_text(encoding="utf-8"))
+    months_es = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+
     def month_label(value):
-        period=pd.Period(value,freq="M")
-        return f"{months_es[period.month-1]} de {period.year}"
-    forecast_label=f"{month_label(forecast_start)} a {month_label(forecast_end)}"
-    metrics=pd.read_csv(TABLES/"cdmx_test_metrics.csv"); boot=pd.read_csv(TABLES/"cdmx_bootstrap_differences.csv"); capacity=pd.read_csv(TABLES/"cdmx_risk_capacity_priority_future.csv",dtype={"geo_id":"string"}); forecast=pd.read_csv(TABLES/"cdmx_monthly_forecast_future.csv",dtype={"geo_id":"string"})
-    geocoverage=pd.read_csv(TABLES/"cdmx_georeference_coverage.csv"); access=pd.read_csv(TABLES/"cdmx_accident_emergency_access.csv",dtype={"geo_id":"string"}); hospitals=pd.read_csv(TABLES/"cdmx_emergency_hospitals_sedesa_2025.csv",dtype={"geo_id":"string"})
-    story=[Spacer(1,2*cm),Paragraph("¿En qué alcaldías habrá mayor peligro vial?",styles["TitleMX"]),Paragraph(f"Pronóstico móvil de {horizon} meses y brechas de atención de emergencia en Ciudad de México",styles["Heading2"]),Spacer(1,.8*cm)]
-    status=_table([["Ámbito","16 alcaldías de Ciudad de México"],["Datos observados",f"enero de 2018 a {month_label(observed_through)}"],["Entrenamiento",f"{min(train_years)}-{max(train_years)}"],["Prueba final",f"{min(test_years)}-{max(test_years)}, rezagos congelados hasta {max(train_years)}"],["Horizonte futuro",forecast_label],["Capacidad","34 hospitales con urgencias verificadas; cartera SEDESA 2025 + CLUES"]],[4.2*cm,11.8*cm]); story.extend([status,Spacer(1,.8*cm),Paragraph("El estudio es predictivo. Las asociaciones del modelo no son efectos causales.",styles["NoteMX"]),PageBreak()])
+        period = pd.Period(value, freq="M")
+        return f"{months_es[period.month - 1]} de {period.year}"
 
-    story.extend([Paragraph("1. Datos y diseño exclusivo de CDMX",styles["SectionMX"]),Paragraph("La unidad de análisis es alcaldía-mes. El resultado es el número de siniestros con al menos una persona herida o fallecida. El panel contiene 1,536 observaciones: 16 alcaldías por 96 meses. Los modelos usan únicamente la historia de CDMX, con rezago de la propia alcaldía, promedio de 12 meses, mes del año, tendencia, identidad de alcaldía y promedio rezagado de alcaldías vecinas.",styles["BodyText"]),Paragraph(f"La prueba {min(test_years)}-{max(test_years)} no actualiza variables con resultados reales de esos años. Los modelos se seleccionaron mediante validación temporal dentro del periodo de entrenamiento.",styles["BodyText"]),Paragraph("ATUS cubre vialidades urbanas y suburbanas no federales. La ausencia de registros no demuestra ausencia de siniestros.",styles["NoteMX"]),Spacer(1,8)])
-    story.append(RLImage(str(FIGURES/"cdmx_model_mae.png"),width=15.4*cm,height=9.2*cm)); story.append(Paragraph("Figura 1. Error absoluto medio en la prueba final. Fuente: elaboración propia con ATUS.",styles["NoteMX"]))
-    mdata=[["Modelo","MAE","Devianza Poisson","Captura top 10%"]]+[[r.model,f"{r.mae:.3f}",f"{r.poisson_deviance:.3f}",f"{r.capture_top_10:.1%}"] for r in metrics.itertuples()]; story.extend([Spacer(1,8),_table(mdata,[5.2*cm,3*cm,4*cm,3.6*cm]),Paragraph(f"Tabla 1. Desempeño predictivo {min(test_years)}-{max(test_years)}. Menor es mejor para MAE y devianza; mayor es mejor para captura.",styles["NoteMX"]),PageBreak()])
+    forecast_label = f"{month_label(manifest['forecast_start'])} a {month_label(manifest['forecast_end'])}"
+    metrics = pd.read_csv(TABLES / "cdmx_test_metrics.csv")
+    validation = pd.read_csv(TABLES / "cdmx_temporal_validation.csv")
+    capacity = pd.read_csv(TABLES / "cdmx_risk_capacity_priority_future.csv", dtype={"geo_id": "string"})
+    forecast = pd.read_csv(TABLES / "cdmx_monthly_forecast_future.csv", dtype={"geo_id": "string"})
+    geocoverage = pd.read_csv(TABLES / "cdmx_georeference_coverage.csv")
+    access = pd.read_csv(TABLES / "cdmx_accident_emergency_access.csv", dtype={"geo_id": "string"})
+    hospitals = pd.read_csv(TABLES / "cdmx_emergency_hospital_capacity_2026.csv", dtype={"geo_id": "string"})
+    pressure = pd.read_csv(TABLES / "cdmx_borough_hospital_pressure_future.csv", dtype={"geo_id": "string"})
+    recommendations = pd.read_csv(TABLES / "cdmx_new_hospital_candidates.csv", dtype={"geo_id": "string"})
 
-    victim_points=int(geocoverage.siniestros_con_victimas_y_coordenadas.sum()); victim_total=int(geocoverage.siniestros_con_victimas.sum()); point_coverage=victim_points/victim_total
-    coverage_data=[["Año","Con víctimas","Con coordenadas","Cobertura"]]+[[str(int(r.ANIO)),f"{int(r.siniestros_con_victimas):,}",f"{int(r.siniestros_con_victimas_y_coordenadas):,}",f"{r.cobertura_coord_victimas_pct:.1f}%"] for r in geocoverage.itertuples()]
-    far=access.sort_values("p90_nearest_emergency_km",ascending=False).head(4)
-    far_data=[["Alcaldía","Hosp. urg.","Mediana km","P90 km",">5 km"]]+[[r.nomgeo,str(int(r.verified_emergency_hospitals)),f"{r.median_nearest_emergency_km:.1f}",f"{r.p90_nearest_emergency_km:.1f}",f"{r.share_over_5km:.1%}"] for r in far.itertuples()]
-    story.extend([Paragraph("2. Puntos observados y hospitales con urgencias",styles["SectionMX"]),Paragraph(f"INEGI proporciona coordenadas para {victim_points:,} de {victim_total:,} siniestros con víctimas de CDMX entre 2019 y 2024 ({point_coverage:.1%}). El mapa muestra eventos observados; no representa una predicción puntual. La cartera SEDESA identifica {len(hospitals)} hospitales con al menos un servicio explícito de urgencias y CLUES aporta sus coordenadas.",styles["BodyText"]),RLImage(str(FIGURES/"cdmx_accident_points_emergency_hospitals.png"),width=11.4*cm,height=14.4*cm),Paragraph("Figura 2. Cada punto rojo es un siniestro con personas heridas o fallecidas; los triángulos son hospitales con urgencias generales, pediátricas o gineco-obstétricas verificadas en la cartera.",styles["NoteMX"]),Spacer(1,6),_table(coverage_data,[2.3*cm,4.2*cm,4.3*cm,3.1*cm]),Paragraph("Tabla 2. Cobertura geográfica de los siniestros con víctimas.",styles["NoteMX"]),PageBreak(),Paragraph("Distancia directa a la red de urgencias",styles["SectionMX"]),Paragraph("Se calculó la distancia euclidiana desde cada siniestro con víctimas al hospital verificado más cercano. Milpa Alta y Tlalpan presentan las colas de distancia más altas. Esta medición orienta dónde revisar cobertura operativa; no sustituye tiempos de traslado por la red vial.",styles["BodyText"]),_table(far_data,[5.5*cm,2.2*cm,2.5*cm,2.5*cm,2.4*cm]),Paragraph("Tabla 3. Alcaldías con mayor percentil 90 de distancia al hospital de urgencias más cercano, 2019-2024.",styles["NoteMX"]),PageBreak()])
+    model_names = {"random_forest": "Random Forest Poisson", "xgboost_poisson": "XGBoost Poisson", "negative_binomial": "Binomial negativa", "baseline": "Promedio móvil"}
+    selected = manifest["selected_forecast_model"]
+    story = [
+        Spacer(1, 1.7 * cm),
+        Paragraph("¿Dónde habrá mayor peligro vial y dónde reforzar urgencias?", styles["TitleMX"]),
+        Paragraph("Pronóstico por alcaldía, presión hospitalaria y ubicación de nuevas unidades en Ciudad de México", styles["Heading2"]),
+        Spacer(1, .7 * cm),
+        _table([
+            ["Ámbito", "16 alcaldías de Ciudad de México"],
+            ["Observación", f"enero de 2018 a {month_label(manifest['observed_through'])}"],
+            ["Validación", "progresiva: 2021, 2022 y 2023"],
+            ["Prueba final", "2024-2025; no selecciona el modelo"],
+            ["Modelo futuro", model_names[selected]],
+            ["Horizonte", forecast_label],
+            ["Capacidad", f"{len(hospitals)} hospitales; recursos SINERHIAS 2026"],
+        ], [4.2 * cm, 11.8 * cm]),
+        Spacer(1, .8 * cm),
+        Paragraph("El estudio es predictivo y de planeación. Las asociaciones no son efectos causales y las coordenadas propuestas requieren factibilidad técnica.", styles["NoteMX"]),
+        PageBreak(),
+    ]
 
-    rf=boot[boot.model.eq("random_forest")].iloc[0]; xgb=boot[boot.model.eq("xgboost_poisson")].iloc[0]
-    story.extend([Paragraph("3. Comparación de modelos e incertidumbre",styles["SectionMX"]),Paragraph(f"Random Forest obtuvo el menor MAE ({metrics.loc[metrics.mae.idxmin(),'mae']:.3f}); XGBoost Poisson obtuvo la menor devianza ({metrics.loc[metrics.poisson_deviance.idxmin(),'poisson_deviance']:.3f}). Frente al baseline, la diferencia bootstrap de MAE de Random Forest fue {rf.difference:.3f}, IC 95% [{rf.ci_lower:.3f}, {rf.ci_upper:.3f}], y la de XGBoost fue {xgb.difference:.3f}, IC 95% [{xgb.ci_lower:.3f}, {xgb.ci_upper:.3f}]. Ambos intervalos incluyen cero.",styles["BodyText"]),Paragraph("XGBoost Poisson se utiliza para el escenario operativo por modelar explícitamente conteos y lograr la menor devianza. La cercanía entre modelos obliga a tratar el orden de alcaldías como una prioridad aproximada, no como certeza.",styles["BodyText"]),Paragraph("La muestra tiene solo 16 unidades espaciales. El bootstrap reagrupa meses completos por alcaldía y no elimina la incertidumbre por cambios de registro o movilidad.",styles["NoteMX"]),PageBreak()])
+    validation_summary = validation[validation["selected_option"]].groupby("model", as_index=False).mae.mean().sort_values("mae")
+    vtable = [["Modelo", "MAE medio 2021-2023"]] + [[model_names.get(r.model, r.model), f"{r.mae:.3f}"] for r in validation_summary.itertuples()]
+    mtable = [["Modelo", "MAE", "Devianza Poisson", "Captura top 10%"]] + [[model_names.get(r.model, r.model), f"{r.mae:.3f}", f"{r.poisson_deviance:.3f}", f"{r.capture_top_10:.1%}"] for r in metrics.sort_values("mae").itertuples()]
+    test_best = metrics.sort_values("mae").iloc[0]
+    story.extend([
+        Paragraph("1. Entrenamiento, pandemia y selección", styles["SectionMX"]),
+        Paragraph("La unidad es alcaldía-mes y el resultado es el conteo de siniestros con al menos una persona herida o fallecida. Los predictores son rezago mensual, promedio de doce meses, rezago de alcaldías contiguas, estacionalidad, tendencia e identidad territorial.", styles["BodyText"]),
+        Paragraph("Se conserva 2020 como choque real de movilidad. La validación entrena 2018-2020 y valida 2021; después amplía el entrenamiento para validar 2022 y 2023. No se proyecta una etiqueta de pandemia porque no representa una condición futura conocida.", styles["BodyText"]),
+        _table(vtable, [9.5 * cm, 6.1 * cm]),
+        Paragraph(f"Tabla 1. {model_names[selected]} obtuvo el menor MAE medio y se eligió antes de abrir la prueba final.", styles["NoteMX"]),
+        Spacer(1, 7),
+        RLImage(str(FIGURES / "cdmx_model_mae.png"), width=15.3 * cm, height=8.9 * cm),
+        Paragraph("Figura 1. Error absoluto medio en la prueba final 2024-2025.", styles["NoteMX"]),
+        Spacer(1, 7),
+        _table(mtable, [5.0 * cm, 2.6 * cm, 4.2 * cm, 3.7 * cm]),
+        Paragraph(f"Tabla 2. En la prueba final, {model_names[test_best.model]} logró el menor MAE ({test_best.mae:.3f}). Ese resultado se reporta como diagnóstico y no reemplaza la regla de selección predefinida.", styles["NoteMX"]),
+        PageBreak(),
+    ])
 
-    bridge_note=f" Para alcanzar el inicio solicitado se generaron {bridge} meses puente desde el último dato observado; esa recursión amplía la incertidumbre." if bridge else ""
-    story.extend([Paragraph(f"4. ¿Dónde se predice mayor peligro de {forecast_label}?",styles["SectionMX"]),Paragraph(f"El modelo se reajustó con toda la historia observada hasta {month_label(observed_through)} y generó un horizonte móvil de {horizon} meses, actualizando rezagos con predicciones previas.{bridge_note}",styles["BodyText"]),RLImage(str(FIGURES/"cdmx_risk_map_future.png"),width=14.2*cm,height=14.2*cm),Paragraph(f"Figura 3. Conteo predicho de siniestros con víctimas durante {horizon} meses. Los números interiores son claves de alcaldía. Polígonos: INEGI.",styles["NoteMX"]),PageBreak(),Paragraph("Ranking de las 16 alcaldías",styles["SectionMX"])])
-    top=capacity.sort_values("predicted_horizon_victim_crashes",ascending=False); tdata=[["Rango","Alcaldía","Predicción","Por 100 mil hab."]]+[[str(i+1),r.nomgeo,f"{r.predicted_horizon_victim_crashes:,.0f}",f"{r.predicted_horizon_per_100k:,.1f}"] for i,r in enumerate(top.itertuples())]; story.extend([Spacer(1,7),_table(tdata,[1.3*cm,7.2*cm,3.4*cm,3.6*cm]),Paragraph(f"Tabla 4. Ranking para el horizonte de {horizon} meses. La tasa usa población fija como contexto y no exposición por viaje.",styles["NoteMX"]),Spacer(1,6),RLImage(str(FIGURES/"cdmx_forecast_ranking_future.png"),width=15.2*cm,height=9.5*cm),Paragraph("Figura 4. Comparación del conteo predicho entre alcaldías.",styles["NoteMX"]),PageBreak()])
+    victim_points = int(geocoverage.siniestros_con_victimas_y_coordenadas.sum())
+    victim_total = int(geocoverage.siniestros_con_victimas.sum())
+    far = access.sort_values("p90_nearest_emergency_km", ascending=False).head(5)
+    far_table = [["Alcaldía", "P90 km", ">5 km", "Hosp. urg."]] + [[r.nomgeo, f"{r.p90_nearest_emergency_km:.1f}", f"{r.share_over_5km:.1%}", str(int(r.verified_emergency_hospitals))] for r in far.itertuples()]
+    story.extend([
+        Paragraph("2. Granularidad puntual y red actual", styles["SectionMX"]),
+        Paragraph(f"ATUS georreferenciado permite ubicar {victim_points:,} de {victim_total:,} siniestros con víctimas de 2019-2024 ({victim_points / victim_total:.1%}). Estos puntos distribuyen el pronóstico futuro dentro de cada alcaldía según la severidad histórica; no son predicciones de eventos individuales.", styles["BodyText"]),
+        RLImage(str(FIGURES / "cdmx_accident_points_emergency_hospitals.png"), width=11.3 * cm, height=14.1 * cm),
+        Paragraph("Figura 2. Puntos observados y hospitales SEDESA/IMSS-Bienestar con urgencias verificadas.", styles["NoteMX"]),
+        Spacer(1, 7),
+        _table(far_table, [7.2 * cm, 2.7 * cm, 2.7 * cm, 3.0 * cm]),
+        Paragraph("Tabla 3. Cola de distancia directa al hospital más cercano. No equivale a tiempo de ambulancia.", styles["NoteMX"]),
+        PageBreak(),
+    ])
 
-    story.extend([Paragraph("5. Oferta de atención y brecha relativa",styles["SectionMX"]),Paragraph("El indicador principal compara la participación de cada alcaldía en el riesgo predicho con su participación en los 34 hospitales que la cartera SEDESA marca con al menos un servicio de urgencias. Las coordenadas proceden de CLUES. El conteo agregado de infraestructura SEDESA 2020 se conserva como contexto secundario.",styles["BodyText"]),RLImage(str(FIGURES/"cdmx_capacity_gap.png"),width=15.2*cm,height=10.1*cm),Paragraph("Figura 5. Valores positivos indican que la participación en el riesgo predicho supera la participación en hospitales con urgencias verificadas. Es una brecha relativa, no una recomendación automática de construcción.",styles["NoteMX"])])
-    pdata=capacity.sort_values("capacity_priority_rank").head(8); ptable=[["Prioridad","Alcaldía","Riesgo pred.","Hosp. urg.","Brecha pp"]]+[[str(r.capacity_priority_rank),r.nomgeo,f"{r.predicted_horizon_victim_crashes:,.0f}",str(int(r.verified_emergency_hospitals)),f"{r.gap_verified_emergency*100:+.1f}"] for r in pdata.itertuples()]; story.extend([Spacer(1,7),_table(ptable,[1.7*cm,6.4*cm,3.1*cm,2.4*cm,2.5*cm]),Paragraph("Tabla 5. Primeras ocho alcaldías por brecha entre riesgo predicho y hospitales con urgencias.",styles["NoteMX"]),PageBreak()])
+    bridge_note = f" Incluye {manifest['recursive_bridge_months']} meses puente desde el último dato observado." if manifest["recursive_bridge_months"] else ""
+    top = capacity.sort_values("predicted_horizon_victim_crashes", ascending=False)
+    rank_table = [["Rango", "Alcaldía", "Predicción", "Por 100 mil"]] + [[str(i + 1), r.nomgeo, f"{r.predicted_horizon_victim_crashes:,.0f}", f"{r.predicted_horizon_per_100k:,.1f}"] for i, r in enumerate(top.itertuples())]
+    story.extend([
+        Paragraph(f"3. Pronóstico futuro: {forecast_label}", styles["SectionMX"]),
+        Paragraph(f"El modelo ganador se reajustó con toda la historia 2018-2025 y generó {manifest['forecast_horizon_months']} meses de pronóstico recursivo.{bridge_note}", styles["BodyText"]),
+        RLImage(str(FIGURES / "cdmx_risk_map_future.png"), width=13.9 * cm, height=13.9 * cm),
+        Paragraph("Figura 3. Conteo predicho de siniestros con víctimas por alcaldía.", styles["NoteMX"]),
+        PageBreak(),
+        Paragraph("Ranking de las 16 alcaldías", styles["SectionMX"]),
+        _table(rank_table, [1.3 * cm, 7.0 * cm, 3.5 * cm, 3.7 * cm]),
+        Paragraph("Tabla 4. La tasa usa población censal fija como contexto; no mide exposición por viaje.", styles["NoteMX"]),
+        Spacer(1, 6),
+        RLImage(str(FIGURES / "cdmx_forecast_ranking_future.png"), width=15.2 * cm, height=9.4 * cm),
+        Paragraph("Figura 4. Comparación del conteo predicho entre alcaldías.", styles["NoteMX"]),
+        PageBreak(),
+    ])
 
-    priority_names=", ".join(capacity.sort_values("capacity_priority_rank").head(5).nomgeo.tolist())
-    story.extend([Paragraph("6. Interpretación para política pública",styles["SectionMX"]),Paragraph(f"Las primeras alcaldías por brecha entre riesgo predicho y hospitales con urgencias son {priority_names}. En paralelo, Milpa Alta y Tlalpan requieren revisión operativa por sus mayores distancias en la cola de la distribución observada.",styles["BodyText"]),Paragraph("La decisión de abrir o redistribuir servicios debe incorporar horarios, capacidad, ambulancias, demanda de población flotante, conectividad vial y tiempos de traslado. Las distancias directas permiten una auditoría inicial de las zonas críticas y de los corredores con menor cercanía a la red.",styles["BodyText"]),Paragraph("Las alcaldías con más siniestros no necesariamente tienen mayor riesgo por habitante o por viaje. Tampoco se demuestra que añadir una unidad reduzca siniestros; la infraestructura se evalúa para respuesta posterior al evento.",styles["NoteMX"]),Paragraph("7. Limitaciones",styles["SectionMX"]),Paragraph("La cartera de servicios corresponde a 2025 y las coordenadas CLUES a agosto de 2026. La red analizada es SEDESA/IMSS-Bienestar y no representa IMSS, ISSSTE, hospitales privados, Cruz Roja ni bases de ambulancias. Las distancias son euclidianas; todavía no incorporan tráfico, accesos, horarios, capacidad disponible o tiempos de respuesta.",styles["BodyText"]),Paragraph("El mapa puntual describe 2019-2024. La predicción sigue teniendo resolución de alcaldía; predecir por punto, corredor o colonia exige un modelo espacial nuevo con red vial, exposición y una partición territorial estable.",styles["BodyText"]),PageBreak()])
+    top_pressure = pressure.sort_values("pressure_rank").head(8)
+    pressure_table = [["Rango", "Alcaldía", "Riesgo pred.", "Camas urg.", "Por cama", "Urgenciólogos"]] + [[str(int(r.pressure_rank)), r.nomgeo, f"{r.predicted_horizon_victim_crashes:,.0f}", f"{int(r.emergency_beds)}", f"{r.predicted_crashes_per_emergency_bed:.1f}", f"{int(r.emergency_physicians)}"] for r in top_pressure.itertuples()]
+    story.extend([
+        Paragraph("4. Presión hospitalaria medible", styles["SectionMX"]),
+        Paragraph(f"Los {len(hospitals)} hospitales coincidieron uno a uno por CLUES con SINERHIAS. Para esta red IMSS-Bienestar, el corte de recursos es 15 de mayo de 2026. La capacidad incluye {int(hospitals.emergency_beds.sum())} camas de urgencias, {int(hospitals.emergency_physicians.sum())} médicos urgenciólogos y {int(hospitals.contact_nurses.sum()):,} enfermeras en contacto con pacientes.", styles["BodyText"]),
+        Paragraph("La presión principal divide siniestros predichos entre camas de urgencias. También se publican razones por médico urgenciólogo y por personal de enfermería. Los denominadores no se mezclan y los ceros no se imputan.", styles["BodyText"]),
+        RLImage(str(FIGURES / "cdmx_hospital_pressure.png"), width=15.2 * cm, height=10.1 * cm),
+        Paragraph("Figura 5. Carga vial futura por cama de urgencias ubicada en cada alcaldía.", styles["NoteMX"]),
+        Spacer(1, 7),
+        _table(pressure_table, [1.2 * cm, 5.0 * cm, 2.5 * cm, 2.1 * cm, 2.2 * cm, 2.4 * cm], font_size=7.5),
+        Paragraph("Tabla 5. Cuauhtémoc presenta la mayor razón proyectada. El indicador orienta planeación; no mide ocupación ni saturación clínica.", styles["NoteMX"]),
+        PageBreak(),
+    ])
 
-    story.extend([Paragraph("8. Reproducibilidad y fuentes",styles["SectionMX"]),Paragraph("Resultados reproducibles: outputs/tables/cdmx_georeference_coverage.csv, cdmx_emergency_hospitals_sedesa_2025.csv, cdmx_accident_emergency_access.csv, cdmx_test_metrics.csv, cdmx_monthly_forecast_future.csv y cdmx_risk_capacity_priority_future.csv. El manifiesto del modelo registra el horizonte exacto en outputs/models/cdmx_manifest.json.",styles["BodyText"]),Paragraph("Fuentes: INEGI, ATUS anual 2018-2025 y ATUS georreferenciado 2019-2024; Secretaría de Salud, CLUES diciembre 2024 y agosto 2026; SEDESA/IMSS-Bienestar CDMX, cartera de servicios hospitalarios de segundo nivel 2025; INEGI, Marco Geoestadístico.",styles["BodyText"]),Paragraph("Conclusión",styles["SectionMX"]),Paragraph("El proyecto distingue tres productos: puntos históricos de siniestros, pronóstico futuro móvil por alcaldía y ubicación verificada de hospitales con urgencias. La combinación permite seleccionar alcaldías y corredores para una auditoría operativa y priorizar el cálculo posterior de tiempos reales por red vial.",styles["BodyText"]),Paragraph(f"Se generaron {len(forecast)} predicciones alcaldía-mes para {forecast_label}.",styles["NoteMX"])])
-    doc.build(story); return output
+    equity = recommendations[recommendations.criterion.str.startswith("equity")].sort_values("recommended_order")
+    efficiency = recommendations[recommendations.criterion.eq("efficiency_1")].iloc[0]
+    location_table = [["Orden", "Alcaldía", "Latitud", "Longitud", "P90 antes", "P90 después", ">5 km después"]] + [[str(int(r.recommended_order)), r.alcaldia, f"{r.latitude:.6f}", f"{r.longitude:.6f}", f"{r.worst_borough_p90_before_km:.2f}", f"{r.worst_borough_p90_after_km:.2f}", f"{r.risk_share_beyond_5km_after:.2%}"] for r in equity.itertuples()]
+    story.extend([
+        Paragraph("5. ¿Dónde ubicar el siguiente hospital?", styles["SectionMX"]),
+        Paragraph("La regla principal minimiza el peor percentil 90 de distancia entre alcaldías; en caso de empate minimiza la distancia media ponderada. Tras añadir cada hospital se vuelve a optimizar. Los candidatos son centros de celdas de 1 km dentro de CDMX y a por lo menos 2 km de la red actual.", styles["BodyText"]),
+        RLImage(str(FIGURES / "cdmx_new_hospital_locations.png"), width=14.7 * cm, height=14.7 * cm),
+        Paragraph("Figura 6. Estrellas: secuencia recomendada por equidad. Rombo: alternativa de eficiencia global.", styles["NoteMX"]),
+        PageBreak(),
+        Paragraph("Secuencia y capacidad de referencia", styles["SectionMX"]),
+        _table(location_table, [1.1 * cm, 3.5 * cm, 2.4 * cm, 2.5 * cm, 2.1 * cm, 2.2 * cm, 2.4 * cm], font_size=7.4),
+        Paragraph(f"Tabla 6. Primero Milpa Alta y después Tlalpan. El peor P90 baja de {equity.iloc[0].worst_borough_p90_before_km:.2f} km a {equity.iloc[-1].worst_borough_p90_after_km:.2f} km. La alternativa de eficiencia está en {efficiency.alcaldia} ({efficiency.latitude:.6f}, {efficiency.longitude:.6f}) y reduce la distancia media de {efficiency.weighted_mean_distance_before_km:.2f} a {efficiency.weighted_mean_distance_after_km:.2f} km.", styles["NoteMX"]),
+        Spacer(1, 8),
+        Paragraph("El escenario para comparar una unidad nueva usa la mediana observada: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Sirve para dimensionar la prueba de localización; no sustituye un programa médico-arquitectónico.", styles["BodyText"]),
+        Paragraph("Las coordenadas son centros de cuadrícula, no predios disponibles. Antes de invertir deben verificarse suelo, accesos, tiempos viales, población flotante, costos, ambulancias y capacidad de IMSS, ISSSTE, sector privado y Cruz Roja.", styles["BodyText"]),
+    ])
+
+    story.extend([
+        Paragraph("6. SINBA, límites y reproducibilidad", styles["SectionMX"]),
+        Paragraph("El cubo SINBA de urgencias 2025 contiene una medida de atenciones y dimensiones por unidad médica, CLUES, tipo de urgencia y afección principal. El portal la publica mediante Microsoft Office Web Components y conexión nativa de Analysis Services; no ofrece una descarga CSV ni un endpoint HTTP reproducible por unidad. Se registraron sus metadatos, pero no se usaron cifras de ocupación.", styles["BodyText"]),
+        Paragraph("Por ello, presión hospitalaria significa carga vial predicha por recurso disponible. No significa pacientes por cama, ocupación, tiempos de espera ni saturación. Cuando DGIS publique una extracción estable por CLUES, deberá agregarse atenciones anuales por hospital y calcular urgencias por cama y por turno.", styles["NoteMX"]),
+        Paragraph("Limitaciones principales", styles["SectionMX"]),
+        Paragraph("La ubicación usa distancia euclidiana y patrones puntuales 2019-2024; el pronóstico conserva resolución de alcaldía. ATUS excluye carreteras federales. La red hospitalaria analizada no es todo el sistema de salud. El horizonte contiene meses puente y su incertidumbre aumenta con cada paso recursivo.", styles["BodyText"]),
+        Paragraph("Fuentes y archivos", styles["SectionMX"]),
+        Paragraph("Fuentes oficiales: INEGI ATUS anual 2018-2025 y georreferenciado 2019-2024; Secretaría de Salud, CLUES agosto de 2026; SEDESA, cartera hospitalaria 2025; DGIS, SINERHIAS y SINBA; INEGI, Marco Geoestadístico.", styles["BodyText"]),
+        Paragraph("Tablas reproducibles: cdmx_emergency_hospital_capacity_2026.csv, cdmx_borough_hospital_pressure_future.csv, cdmx_hospital_pressure_future.csv y cdmx_new_hospital_candidates.csv. La metodología completa está en docs/metodologia_actualizada.md.", styles["BodyText"]),
+        Paragraph("Conclusión", styles["SectionMX"]),
+        Paragraph(f"Para {forecast_label}, Cuauhtémoc encabeza la presión por cama de urgencias. Para cerrar la peor brecha territorial, la secuencia analítica propone primero Milpa Alta y después Tlalpan. Estas ubicaciones pasan a una fase de factibilidad vial, clínica, financiera y predial.", styles["BodyText"]),
+        Paragraph(f"Se generaron {len(forecast)} predicciones alcaldía-mes y se integraron recursos oficiales para {len(hospitals)} hospitales.", styles["NoteMX"]),
+    ])
+    doc.build(story)
+    return output
