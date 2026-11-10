@@ -1,6 +1,6 @@
 # ¿En qué alcaldías habrá mayor peligro vial?
 
-Pipeline reproducible para predecir siniestros viales con personas heridas o fallecidas en las **16 alcaldías de Ciudad de México** y comparar el riesgo esperado con la infraestructura SEDESA reportada. El estudio es predictivo, no causal.
+Pipeline reproducible para predecir siniestros viales con personas heridas o fallecidas en las **16 alcaldías de Ciudad de México** y localizar nuevas clínicas de urgencias mediante una cuadrícula de 1 km que compara demanda futura con camas accesibles. El estudio es predictivo, no causal.
 
 ## Estado actual
 
@@ -19,7 +19,8 @@ ATUS anual 2018-2025 fue procesado, pero el análisis sustantivo usa exclusivame
 - Presión vial proyectada por cama de urgencias, médico urgenciólogo y enfermería.
 - Flujo observado exclusivamente de urgencias: atenciones, urgencias calificadas, ingresos, traslados, defunciones y horas de estancia.
 - Atenciones de urgencias por cama y ocupación aproximada basada en horas registradas de cama de observación o choque.
-- Secuencia de hospitales adicionales mediante una cuadrícula de 1 km y criterio de equidad territorial.
+- Opportunity Atlas en cuadrícula de 1 km: verde indica menor presión y rojo mayor demanda predicha por cama de urgencias accesible.
+- Secuencia de clínicas adicionales que minimiza primero el P90 de presión ponderado por demanda y recalcula la oferta después de cada ubicación.
 
 ## Instalación
 
@@ -57,6 +58,6 @@ Se comparan promedio móvil de 12 meses, binomial negativa, Random Forest y XGBo
 
 ## Límites sustantivos
 
-ATUS excluye carreteras federales; la ausencia de registros no prueba ausencia de siniestros. La población censal 2020 es fija. El mapa puntual es histórico y la predicción conserva resolución de alcaldía. La incertidumbre aumenta con cada mes recursivo entre el último dato observado y el horizonte objetivo. Las distancias a hospitales son euclidianas y no equivalen a tiempo de ambulancia. El flujo DGIS describe atenciones registradas y no contiene el origen geográfico preciso del paciente. La ocupación calculada es aproximada y no sustituye censos horarios ni tiempos de espera. La red analizada cubre SEDESA/IMSS-Bienestar y no incluye todo IMSS, ISSSTE, sector privado, Cruz Roja ni bases de ambulancias.
+ATUS excluye carreteras federales; la ausencia de registros no prueba ausencia de siniestros. La población censal 2020 es fija. El modelo temporal conserva resolución de alcaldía-mes; la cuadrícula distribuye ese pronóstico según los puntos y la severidad histórica de 2019-2024, por lo que no es un pronóstico independiente por celda. La incertidumbre aumenta con cada mes recursivo entre el último dato observado y el horizonte objetivo. Las distancias a hospitales son euclidianas y no equivalen a tiempo de ambulancia. El flujo DGIS describe atenciones registradas y no contiene el origen geográfico preciso del paciente. La ocupación calculada es aproximada y no sustituye censos horarios ni tiempos de espera. La red analizada cubre SEDESA/IMSS-Bienestar y no incluye todo IMSS, ISSSTE, sector privado, Cruz Roja ni bases de ambulancias.
 
 La definición completa de entrenamiento, pandemia, presión y ubicación está en [`docs/metodologia_actualizada.md`](docs/metodologia_actualizada.md).

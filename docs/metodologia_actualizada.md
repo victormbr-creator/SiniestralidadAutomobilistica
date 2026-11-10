@@ -2,7 +2,7 @@
 
 ## Pregunta de política pública
 
-El proyecto estima en qué alcaldías de Ciudad de México habrá más siniestros viales con personas heridas o fallecidas y dónde conviene evaluar hospitales de urgencias adicionales. La predicción tiene resolución alcaldía-mes; las coordenadas propuestas son centros de celdas analíticas de 1 km y requieren validación de predio, uso de suelo, red vial y operación.
+El proyecto estima en qué alcaldías de Ciudad de México habrá más siniestros viales con personas heridas o fallecidas y dónde conviene evaluar clínicas de urgencias adicionales. El modelo temporal tiene resolución alcaldía-mes. Para decidir ubicaciones, el pronóstico se desagrega en una cuadrícula de 1 km usando los puntos históricos; las coordenadas propuestas son centros de celdas analíticas y requieren validación de predio, uso de suelo, red vial y operación.
 
 ## Pronóstico y tratamiento de la pandemia
 
@@ -78,27 +78,52 @@ La presión vial proyectada y el flujo asistencial observado se mantienen separa
 
 Para priorizar ampliaciones en hospitales existentes, cada razón por cama se transforma en percentil dentro de la red y se promedian ambos percentiles. Este `dual_pressure_score` identifica unidades con flujo total alto y exposición vial futura alta sin sumar pacientes y siniestros en una unidad artificial. Se publica como tamizaje; la inversión exige comprobar turnos, ocupación censada y capacidad efectiva.
 
-## Demanda puntual y accesibilidad
+## Demanda puntual y cuadrícula de 1 km
 
-El pronóstico de cada alcaldía se distribuye entre sus siniestros georreferenciados de 2019-2024, proporcionalmente al número observado de personas heridas y fallecidas, con peso mínimo uno. Esto conserva exactamente el total predicho por alcaldía y usa los puntos solo para ubicar la demanda dentro del territorio.
+El pronóstico de cada alcaldía se distribuye entre sus siniestros georreferenciados de 2019-2024, proporcionalmente al número observado de personas heridas y fallecidas, con peso mínimo uno. Los puntos ponderados se agregan a celdas de 1 km en EPSG:32614. Esta operación conserva exactamente el total predicho de cada alcaldía y de toda la ciudad.
 
-Cada punto se asigna al hospital actual más cercano mediante distancia euclidiana en EPSG:32614. Esta aproximación sirve para comparar alternativas, pero no representa tiempo de ambulancia ni congestión vial.
+La cuadrícula aprovecha la localización granular para describir dónde se ha concentrado históricamente el riesgo dentro de cada alcaldía. No convierte cada punto en un evento futuro ni constituye un modelo temporal entrenado por celda. La distancia es euclidiana y sirve para comparar alternativas de forma reproducible; no representa tiempo de ambulancia ni congestión vial.
 
 ## Regla para hospitales adicionales
 
-Los candidatos son centros de una cuadrícula de 1 km dentro de CDMX y al menos a 2 km de un hospital existente. La recomendación principal sigue una regla de equidad lexicográfica:
+Los candidatos son centros de celdas de 1 km dentro de CDMX y al menos a 2 km de un hospital existente. La oferta física se distribuye espacialmente antes de comparar demanda y capacidad. Para cada hospital \(j\) y celda \(g\), el peso de acceso es
 
-1. minimizar el peor percentil 90 de distancia entre las 16 alcaldías;
-2. desempatar con la menor distancia media ponderada por demanda;
-3. añadir la ubicación seleccionada y recalcular antes de elegir la siguiente.
+\[
+w_{gj} =
+\begin{cases}
+\exp(-d_{gj}/3000), & d_{gj} \leq 10000\\
+0, & d_{gj} > 10000,
+\end{cases}
+\]
 
-También se reporta una alternativa de eficiencia que minimiza la distancia media ponderada de toda la ciudad. Para dimensionar cada unidad nueva se usa un escenario explícito igual a la mediana de los 34 hospitales actuales: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Es un escenario comparativo, no un programa médico-arquitectónico.
+donde \(d_{gj}\) es la distancia en metros. Las camas accesibles equivalentes en cada celda son
 
-El flujo observado se usa para identificar hospitales actuales que requieren ampliación o revisión operativa. No se asigna ese flujo a las coordenadas candidatas porque los archivos abiertos no incluyen el origen geográfico preciso del paciente. La ubicación de una unidad nueva continúa guiada por la accesibilidad de los puntos de siniestros y el pronóstico territorial; así se evita atribuir a una colonia la demanda observada únicamente en el hospital receptor.
+\[
+C_g = \sum_j C_j\frac{w_{gj}}{\sum_q w_{qj}}.
+\]
+
+La normalización distribuye cada hospital entre sus celdas alcanzables y garantiza que \(\sum_g C_g = \sum_j C_j\). La presión local usada en el Opportunity Atlas es
+
+\[
+P_g = \frac{D_g}{C_g},
+\]
+
+donde \(D_g\) es la demanda vial predicha de la celda. El mapa presenta un índice relativo respecto de la mediana ponderada de presión: verde indica presión menor y rojo presión mayor.
+
+Cada clínica nueva se evalúa con un escenario igual a la mediana de los 34 hospitales actuales: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Sus 10 camas se incorporan a la superficie con la misma función de accesibilidad. La selección es lexicográfica:
+
+1. minimizar el percentil 90 de presión de la ciudad, ponderado por demanda predicha;
+2. desempatar con la menor presión media ponderada;
+3. desempatar con la menor distancia media ponderada a una unidad;
+4. añadir la clínica seleccionada, recalcular oferta y presión, y repetir para la segunda.
+
+La distancia participa en la función de accesibilidad y solo aparece como tercer desempate. La demanda futura y la oferta de camas determinan el criterio principal.
+
+El flujo observado se usa para identificar hospitales actuales que requieren ampliación o revisión operativa. No se distribuye en la cuadrícula porque los archivos abiertos no incluyen el origen geográfico preciso del paciente. Asignar todas las atenciones al hospital receptor atribuiría demanda a la zona equivocada.
 
 ## Criterio de decisión
 
-La secuencia recomendada se acepta para estudio de factibilidad si reduce el peor P90 territorial y la proporción de demanda a más de 5 km. La decisión final requiere añadir tiempos por red vial y hora del día, disponibilidad de predios, población flotante, unidades IMSS/ISSSTE/privadas, bases de ambulancias, ocupación observada y costos.
+La secuencia recomendada se acepta para estudio de factibilidad si reduce el P90 y la media ponderada de presión. La decisión final requiere añadir tiempos por red vial y hora del día, disponibilidad de predios, población flotante, unidades IMSS/ISSSTE/privadas, bases de ambulancias, ocupación observada y costos.
 
 ## Productos reproducibles
 
@@ -109,7 +134,9 @@ La secuencia recomendada se acepta para estudio de factibilidad si reduce el peo
 - `outputs/tables/cdmx_borough_observed_emergency_flow_2025.csv`
 - `outputs/tables/cdmx_borough_hospital_pressure_future.csv`
 - `outputs/tables/cdmx_hospital_pressure_future.csv`
+- `outputs/tables/cdmx_opportunity_grid_future.csv`
 - `outputs/tables/cdmx_new_hospital_candidates.csv`
 - `outputs/figures/cdmx_hospital_pressure.png`
 - `outputs/figures/cdmx_observed_emergency_flow_pressure.png`
 - `outputs/figures/cdmx_new_hospital_locations.png`
+- `outputs/figures/cdmx_opportunity_atlas_pressure.png`

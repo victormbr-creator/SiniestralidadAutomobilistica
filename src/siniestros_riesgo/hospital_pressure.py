@@ -44,6 +44,75 @@ def accessibility_metrics(
     }
 
 
+def distance_decay(
+    distances_m: np.ndarray,
+    scale_m: float = 3_000,
+    catchment_m: float = 10_000,
+) -> np.ndarray:
+    """Exponential access weights with an explicit emergency catchment cutoff."""
+    distances_m = np.asarray(distances_m, dtype=float)
+    if scale_m <= 0 or catchment_m <= 0:
+        raise ValueError("scale_m and catchment_m must be positive")
+    weights = np.exp(-distances_m / scale_m)
+    weights[distances_m > catchment_m] = 0.0
+    return weights
+
+
+def spatial_bed_pressure(
+    distances_m: np.ndarray,
+    demand: np.ndarray,
+    emergency_beds: np.ndarray,
+    scale_m: float = 3_000,
+    catchment_m: float = 10_000,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Allocate physical bed supply across nearby grid cells and form demand/supply.
+
+    Each facility's beds are distributed across its reachable 1 km cells using
+    distance-decay weights that sum to one. Consequently, grid-level accessible
+    bed equivalents sum to the physical bed total and can be compared directly
+    with predicted demand in the same cell.
+    """
+    distances_m = np.asarray(distances_m, dtype=float)
+    demand = np.asarray(demand, dtype=float)
+    emergency_beds = np.asarray(emergency_beds, dtype=float)
+    if distances_m.ndim != 2:
+        raise ValueError("distances_m must have shape grid_cells x facilities")
+    if distances_m.shape != (len(demand), len(emergency_beds)):
+        raise ValueError("distance matrix dimensions do not match demand and beds")
+    if np.any(demand < 0) or np.any(emergency_beds < 0):
+        raise ValueError("demand and beds must be nonnegative")
+    kernel = distance_decay(distances_m, scale_m=scale_m, catchment_m=catchment_m)
+    kernel_total = kernel.sum(axis=0)
+    bed_distribution = np.divide(
+        emergency_beds,
+        kernel_total,
+        out=np.zeros_like(emergency_beds, dtype=float),
+        where=kernel_total > 0,
+    )
+    accessible_bed_equivalents = kernel @ bed_distribution
+    pressure = np.divide(
+        demand,
+        accessible_bed_equivalents,
+        out=np.full(len(demand), np.inf, dtype=float),
+        where=accessible_bed_equivalents > 0,
+    )
+    pressure[(demand == 0) & (accessible_bed_equivalents > 0)] = 0.0
+    return accessible_bed_equivalents, pressure, kernel
+
+
+def pressure_metrics(pressure: np.ndarray, demand: np.ndarray) -> dict[str, float]:
+    """Summarize the pressure surface using predicted demand as policy weight."""
+    pressure = np.asarray(pressure, dtype=float)
+    demand = np.asarray(demand, dtype=float)
+    valid = np.isfinite(pressure) & np.isfinite(demand) & (demand > 0)
+    if not valid.any():
+        return {"weighted_mean_pressure": float("nan"), "weighted_p90_pressure": float("nan")}
+    return {
+        "weighted_mean_pressure": float(np.average(pressure[valid], weights=demand[valid])),
+        "weighted_p90_pressure": weighted_quantile(pressure[valid], demand[valid], 0.90),
+    }
+
+
 def projected_pressure(
     forecast: pd.DataFrame,
     capacity: pd.DataFrame,
@@ -77,4 +146,3 @@ def projected_pressure(
         .astype(int)
     )
     return out.sort_values("pressure_rank").reset_index(drop=True)
-

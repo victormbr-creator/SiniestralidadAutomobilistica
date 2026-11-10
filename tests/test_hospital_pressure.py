@@ -1,7 +1,13 @@
 import numpy as np
 import pandas as pd
 
-from siniestros_riesgo.hospital_pressure import accessibility_metrics, projected_pressure, weighted_quantile
+from siniestros_riesgo.hospital_pressure import (
+    accessibility_metrics,
+    distance_decay,
+    projected_pressure,
+    spatial_bed_pressure,
+    weighted_quantile,
+)
 
 
 def test_weighted_quantile_and_accessibility() -> None:
@@ -27,3 +33,17 @@ def test_projected_pressure_uses_observed_denominators() -> None:
     assert result.loc["A", "predicted_crashes_per_emergency_bed"] == 10
     assert result.loc["A", "pressure_rank"] == 1
 
+
+def test_distance_decay_applies_catchment() -> None:
+    weights = distance_decay(np.array([[0.0, 11_000.0]]), scale_m=3_000, catchment_m=10_000)
+    assert weights[0, 0] == 1.0
+    assert weights[0, 1] == 0.0
+
+
+def test_spatial_bed_pressure_conserves_supply_and_uses_local_demand() -> None:
+    distances = np.array([[0.0], [3_000.0]])
+    demand = np.array([10.0, 0.0])
+    accessible_beds, pressure, _ = spatial_bed_pressure(distances, demand, np.array([12.0]))
+    assert np.isclose(accessible_beds.sum(), 12.0)
+    assert pressure[0] > 0
+    assert pressure[1] == 0
