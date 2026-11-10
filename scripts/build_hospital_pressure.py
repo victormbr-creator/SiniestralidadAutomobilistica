@@ -431,10 +431,13 @@ def make_figures(
         edgecolor="#FFFFFF80",
         legend=True,
         legend_kwds={
-            "label": "Presión relativa: demanda predicha / camas de urgencias accesibles",
+            "label": "Índice relativo sin unidades (1 = mediana ponderada)\nrojo saturado por encima del P95",
             "shrink": .72,
         },
-        missing_kwds={"color": "#D8D8D8", "label": "Sin oferta accesible a 10 km"},
+        missing_kwds={
+            "color": "#D8D8D8",
+            "label": "Sin camas a 10 km; demanda asignada = 0",
+        },
     )
     base.boundary.plot(ax=ax, color="#4D5966", linewidth=.55)
     hospital_gdf.plot(
@@ -466,7 +469,7 @@ def make_figures(
         )
     ax.set_title(
         "Opportunity Atlas de urgencias: demanda vial futura frente a camas accesibles\n"
-        "cuadrícula de 1 km; verde = menor presión, rojo = mayor presión",
+        "cuadrícula de 1 km; índice relativo: 1 = mediana, rojo = mayor presión",
         fontsize=13,
         weight="bold",
     )

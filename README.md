@@ -19,7 +19,7 @@ ATUS anual 2018-2025 fue procesado, pero el análisis sustantivo usa exclusivame
 - Presión vial proyectada por cama de urgencias, médico urgenciólogo y enfermería.
 - Flujo observado exclusivamente de urgencias: atenciones, urgencias calificadas, ingresos, traslados, defunciones y horas de estancia.
 - Atenciones de urgencias por cama y ocupación aproximada basada en horas registradas de cama de observación o choque.
-- Opportunity Atlas en cuadrícula de 1 km: verde indica menor presión y rojo mayor demanda predicha por cama de urgencias accesible.
+- Opportunity Atlas en cuadrícula de 1 km: el índice relativo sin unidades usa 1 como mediana ponderada; verde indica menor presión y rojo mayor demanda predicha por cama de urgencias accesible.
 - Secuencia de clínicas adicionales que minimiza primero el P90 de presión ponderado por demanda y recalcula la oferta después de cada ubicación.
 
 ## Instalación

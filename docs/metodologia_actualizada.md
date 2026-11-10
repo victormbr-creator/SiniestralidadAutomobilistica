@@ -108,9 +108,11 @@ La normalización distribuye cada hospital entre sus celdas alcanzables y garant
 P_g = \frac{D_g}{C_g},
 \]
 
-donde \(D_g\) es la demanda vial predicha de la celda. El mapa presenta un índice relativo respecto de la mediana ponderada de presión: verde indica presión menor y rojo presión mayor.
+donde \(D_g\) es la demanda vial predicha de la celda. Esta presión bruta se mide en siniestros predichos por cama accesible. El mapa divide cada valor entre la mediana ponderada de presión y presenta un índice relativo sin unidades: 1 representa la mediana, verde indica menor presión y rojo mayor presión. Para conservar contraste, el color rojo se satura por encima del percentil 95. Por eso la escala del mapa no coincide numéricamente con el P90 bruto de la tabla de ubicaciones.
 
-Cada clínica nueva se evalúa con un escenario igual a la mediana de los 34 hospitales actuales: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Sus 10 camas se incorporan a la superficie con la misma función de accesibilidad. La selección es lexicográfica:
+Las 236 celdas grises no tienen camas de urgencias a 10 km. En la ejecución actual concentran cero demanda predicha porque no contienen puntos con víctimas de 2019-2024 a los cuales desagregar el pronóstico. Se localizan principalmente en Tlalpan y Milpa Alta. No reciben peso en el objetivo ponderado por demanda; el resultado no significa que estén cubiertas ni que carezcan de población. Esta limitación debe revisarse con población, red vial y tiempos de ambulancia antes de tomar una decisión.
+
+Cada clínica nueva se evalúa con un escenario igual a la mediana de los 34 hospitales actuales: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Sus 10 camas se incorporan a la superficie con la misma función de accesibilidad. Como la red existente suma 364 camas de urgencias, es esperable que una sola unidad produzca una reducción moderada. La selección es lexicográfica:
 
 1. minimizar el percentil 90 de presión de la ciudad, ponderado por demanda predicha;
 2. desempatar con la menor presión media ponderada;

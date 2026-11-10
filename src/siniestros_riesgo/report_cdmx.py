@@ -191,7 +191,7 @@ def build_cdmx_report(output: Path = REPORTS / "resultados_proyecto.pdf") -> Pat
     ])
 
     recommended = recommendations.sort_values("recommended_order")
-    location_table = [["Orden", "Alcaldía", "Latitud", "Longitud", "P90 presión antes", "P90 presión después", "Reducción"]] + [[
+    location_table = [["Orden", "Alcaldía", "Latitud", "Longitud", "P90 bruto antes", "P90 bruto después", "Reducción"]] + [[
         str(int(r.recommended_order)), r.alcaldia, f"{r.latitude:.6f}", f"{r.longitude:.6f}",
         f"{r.weighted_p90_pressure_before:.2f}", f"{r.weighted_p90_pressure_after:.2f}",
         f"{r.weighted_p90_pressure_reduction_pct:.1%}",
@@ -200,21 +200,22 @@ def build_cdmx_report(output: Path = REPORTS / "resultados_proyecto.pdf") -> Pat
     last_location = recommended.iloc[-1]
     story.extend([
         Paragraph("6. ¿Dónde ubicar la siguiente clínica de urgencias?", styles["SectionMX"]),
-        Paragraph("El Opportunity Atlas divide CDMX en celdas de 1 km. En cada celda, la demanda predicha se compara con las camas de urgencias accesibles, distribuidas desde cada hospital mediante una función que disminuye con la distancia y se corta a 10 km. Verde indica menor presión relativa y rojo mayor presión.", styles["BodyText"]),
+        Paragraph("El Opportunity Atlas divide CDMX en celdas de 1 km. En cada celda, la demanda predicha se compara con las camas de urgencias accesibles, distribuidas desde cada hospital mediante una función que disminuye con la distancia y se corta a 10 km. El color presenta un índice sin unidades: 1 equivale a la mediana ponderada de presión; verde indica menor presión relativa y rojo mayor presión.", styles["BodyText"]),
         Paragraph("Cada clínica candidata añade 10 camas. La selección minimiza primero el P90 de presión ponderado por demanda, después la presión media y finalmente la distancia media. La superficie se recalcula antes de elegir la segunda ubicación. Los candidatos están dentro de CDMX y a por lo menos 2 km de un hospital actual.", styles["BodyText"]),
         RLImage(str(FIGURES / "cdmx_opportunity_atlas_pressure.png"), width=14.7 * cm, height=14.7 * cm),
-        Paragraph("Figura 7. Opportunity Atlas de demanda vial futura frente a camas accesibles; las estrellas muestran la secuencia recomendada.", styles["NoteMX"]),
+        Paragraph("Figura 7. El color es un índice relativo sin unidades; la tabla siguiente usa presión bruta en siniestros predichos por cama accesible. El rojo se satura sobre el P95 para conservar contraste. Las celdas grises, principalmente en Tlalpan y Milpa Alta, no tienen camas a 10 km ni demanda asignada con el patrón histórico, por lo que no pesan en el objetivo.", styles["NoteMX"]),
         PageBreak(),
         Paragraph("Secuencia y capacidad de referencia", styles["SectionMX"]),
         _table(location_table, [1.0 * cm, 3.1 * cm, 2.2 * cm, 2.3 * cm, 2.7 * cm, 2.8 * cm, 1.8 * cm], font_size=7.1),
         Paragraph(
             f"Tabla 7. La secuencia propone primero {first_location.alcaldia} y después {last_location.alcaldia}. "
-            f"El P90 ponderado de presión baja de {first_location.weighted_p90_pressure_before:.2f} a "
-            f"{last_location.weighted_p90_pressure_after:.2f} tras las dos clínicas.",
+            f"El P90 bruto, medido en siniestros predichos por cama accesible, baja de "
+            f"{first_location.weighted_p90_pressure_before:.2f} a {last_location.weighted_p90_pressure_after:.2f} "
+            f"tras las dos clínicas.",
             styles["NoteMX"],
         ),
         Spacer(1, 8),
-        Paragraph("El escenario para comparar una unidad nueva usa la mediana observada: 10 camas de urgencias, 2 médicos urgenciólogos y 160 enfermeras en contacto. Sirve para dimensionar la prueba de localización; no sustituye un programa médico-arquitectónico.", styles["BodyText"]),
+        Paragraph("Las reducciones de 5.1% y 3.4% son moderadas: cada clínica simulada añade 10 camas frente a las 364 existentes. El personal es una referencia de dimensionamiento; la localización se optimiza con camas accesibles.", styles["BodyText"]),
         Paragraph("Las coordenadas son centros de cuadrícula, no predios disponibles. Antes de invertir deben verificarse suelo, accesos, tiempos viales, población flotante, costos, ambulancias y capacidad de IMSS, ISSSTE, sector privado y Cruz Roja.", styles["BodyText"]),
     ])
 
